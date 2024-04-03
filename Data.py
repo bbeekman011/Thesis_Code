@@ -31,8 +31,8 @@ df_etf_shvol_30min = etf_shvol_30min[None]
 df_etf_vol_30min = etf_vol_30min[None]
 
 
-
 # %%
+
 
 ## Functions
 def split_df_on_symbol(df, symbol_tag):
@@ -57,9 +57,9 @@ def split_df_on_symbol(df, symbol_tag):
 
 
 # %%
-etf_prices_30min_dict = split_df_on_symbol(df_etf_prices_30min, 'SYMBOL')
-etf_shvol_30min_dict = split_df_on_symbol(df_etf_shvol_30min, 'SYMBOL')
-etf_vol_30min_dict = split_df_on_symbol(df_etf_vol_30min, 'SYMBOL')
+etf_prices_30min_dict = split_df_on_symbol(df_etf_prices_30min, "SYMBOL")
+etf_shvol_30min_dict = split_df_on_symbol(df_etf_shvol_30min, "SYMBOL")
+etf_vol_30min_dict = split_df_on_symbol(df_etf_vol_30min, "SYMBOL")
 
 # %%
 for key, df in etf_prices_30min_dict.items():
@@ -78,3 +78,5 @@ for key, df in etf_prices_30min_dict.items():
 
     etf_prices_30min_dict[key] = df
 # %%
+test=3
+print(test)
