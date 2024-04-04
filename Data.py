@@ -2,7 +2,7 @@
 import pyreadr
 import pandas as pd
 from collections import OrderedDict
-from Functions import split_df_on_symbol, merge_df_on_vol_columns
+from Functions import split_df_on_symbol, merge_df_on_vol_columns, get_column_name
 from datetime import datetime
 
 # %%
@@ -92,7 +92,7 @@ columns_to_rename = {
     "Return_15second": "Return_LH",
 }
 
-#%%
+# %%
 
 ## Merge using the function
 etf_merged_30min_daily_dict = merge_df_on_vol_columns(
@@ -102,6 +102,53 @@ etf_merged_30min_daily_dict = merge_df_on_vol_columns(
     columns_to_rename,
     "DATE",
     "TIME",
-    "RETURN")
+    "RETURN",
+)
 
+# %%
+
+
+####
+def merge_df_on_price_rows(
+    merge_dict: dict,
+    merger_dict: dict,
+    date_string: str,
+    time_string: str,
+    col_name_list: list,
+):
+    for col_name in col_name_list:
+        for index, row in merger_dict.iterrows():
+            date = row[date_string]
+            time = row[time_string]
+            column_name = get_column_name(time, col_name)
+
+            if column_name:
+                value = merge_dict.loc[
+                    merge_dict[date_string] == date, column_name
+                ].iloc[0]
+                merger_dict.at[index, col_name] = value
+
+
+# %%
+merge_dict = etf_shvol_vol_30min_dict
+merger_dict = etf_prices_30min_dict
+date_string = "DATE"
+time_string = "TIME"
+col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
+key = "QQQ"
+for col_name in col_name_list:
+    for index, row in merger_dict[key].iterrows():
+        date = row[date_string]
+        time = row[time_string]
+        column_name = get_column_name(time, col_name)
+
+        if column_name:
+            value = (
+                merge_dict[key]
+                .loc[merge_dict[key][date_string] == date, column_name]
+                .iloc[0]
+            )
+            merger_dict[key].at[index, col_name] = value
+
+merger_dict[key]
 # %%

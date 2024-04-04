@@ -12,7 +12,6 @@ def split_df_on_symbol(df, symbol_tag: str):
     Dictionary: Contains a separate dataframe for each symbol (key)
     """
 
-    
     output_dict = {}
     column_list = df.columns.tolist()
     column_list.remove(symbol_tag)
@@ -25,7 +24,6 @@ def split_df_on_symbol(df, symbol_tag: str):
     return output_dict
 
 
-
 def merge_df_on_vol_columns(
     merge_dict: dict,
     merger_dict: dict,
@@ -33,9 +31,8 @@ def merge_df_on_vol_columns(
     rename_col_dict: dict,
     date_string: str,
     time_string: str,
-    return_string: str
+    return_string: str,
 ):
-    
     """This function merges the dataframe containing 30-minute price and return data and merges with a dataframe containing (short) volume data by day in 30 minute intervals by column
     Parameters:
     merge_dict (dictionary): dictionary of dataframes with price data, to merge with other dictionary
@@ -49,16 +46,14 @@ def merge_df_on_vol_columns(
     Returns:
     output_dict (dictionary): dictionary containing dataframes with volume value and price or other return data added
     """
-    
-    
+
     from datetime import datetime
     import pandas as pd
-
 
     output_dict = {}
 
     for key in merger_dict.keys():
-        
+
         df1 = merge_dict[key]
         df2 = merger_dict[key]
 
@@ -89,7 +84,47 @@ def merge_df_on_vol_columns(
         merged_df.rename(columns=rename_col_dict, inplace=True)
 
         output_dict[key] = merged_df
-    
+
     return output_dict
 
 
+def get_column_name(time, category):
+    """This function just hardcodes the shit out of a tough issue, apologies, it's terrible
+    Parameters:
+    time (datetime): input time to be linked to a column name
+    category (string): name of the category the value needs to be taken from
+    here specifically options are (Short, Short_dollar, Volume, Volume_dollar)
+    Returns:
+    string corresponding to correct column name in volume data
+    """
+
+    if time == pd.to_datetime("09:30:00").time():
+        return f"{category}_FH"
+    elif time == pd.to_datetime("10:00:00").time():
+        return f"{category}_09second"
+    elif time == pd.to_datetime("10:30:00").time():
+        return f"{category}_10first"
+    elif time == pd.to_datetime("11:00:00").time():
+        return f"{category}_10second"
+    elif time == pd.to_datetime("11:30:00").time():
+        return f"{category}_11first"
+    elif time == pd.to_datetime("12:00:00").time():
+        return f"{category}_11second"
+    elif time == pd.to_datetime("12:30:00").time():
+        return f"{category}_12first"
+    elif time == pd.to_datetime("13:00:00").time():
+        return f"{category}_12second"
+    elif time == pd.to_datetime("13:30:00").time():
+        return f"{category}_13first"
+    elif time == pd.to_datetime("14:00:00").time():
+        return f"{category}_13second"
+    elif time == pd.to_datetime("14:30:00").time():
+        return f"{category}_14first"
+    elif time == pd.to_datetime("15:00:00").time():
+        return f"{category}_14second"
+    elif time == pd.to_datetime("15:30:00").time():
+        return f"{category}_SLH"
+    elif time == pd.to_datetime("16:00:00").time():
+        return f"{category}_LH"
+    else:
+        return None
