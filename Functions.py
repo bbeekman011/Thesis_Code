@@ -1,7 +1,9 @@
 ## This file contains all the functions used in the thesis project of Bas Beekman
+from datetime import datetime
+import pandas as pd
 
 
-def split_df_on_symbol(df, symbol_tag: str) -> dict:
+def split_df_on_symbol(df, symbol_tag: str):
     """Takes a dataframe containing data for multiple symbols or tickers and transfers these to a dictionary containing separate dataframes for each symbol, that symbol being the key
     Parameters:
     df (dataframe): Input dataframe containing some data on etfs with different symbols
@@ -19,6 +21,7 @@ def split_df_on_symbol(df, symbol_tag: str) -> dict:
 
         output_dict[symbol] = data
 
+    print("At the end")
     return output_dict
 
 
@@ -46,10 +49,10 @@ def merge_df_on_vol_columns(
     """
     from datetime import datetime
     import pandas as pd
-
     output_dict = {}
 
     for key in merger_dict.keys():
+        
         df1 = merge_dict[key]
         df2 = merger_dict[key]
 
@@ -82,3 +85,8 @@ def merge_df_on_vol_columns(
         output_dict[key] = merged_df
     
     return output_dict
+
+
+def test_1():
+    print("hello")
+    return "x"
