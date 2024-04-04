@@ -101,7 +101,7 @@ def get_column_name(time, category):
     if time == pd.to_datetime("09:30:00").time():
         return f"{category}_FH"
     elif time == pd.to_datetime("10:00:00").time():
-        return f"{category}_09second"
+        return f"{category}_9second"
     elif time == pd.to_datetime("10:30:00").time():
         return f"{category}_10first"
     elif time == pd.to_datetime("11:00:00").time():
