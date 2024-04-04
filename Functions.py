@@ -25,6 +25,7 @@ def split_df_on_symbol(df, symbol_tag: str):
     return output_dict
 
 
+
 def merge_df_on_vol_columns(
     merge_dict: dict,
     merger_dict: dict,
@@ -34,6 +35,8 @@ def merge_df_on_vol_columns(
     time_string: str,
     return_string: str
 ):
+    print("This does something")
+
     """This function merges the dataframe containing 30-minute price and return data and merges with a dataframe containing (short) volume data by day in 30 minute intervals by column
     Parameters:
     merge_dict (dictionary): dictionary of dataframes with price data, to merge with other dictionary
@@ -87,6 +90,3 @@ def merge_df_on_vol_columns(
     return output_dict
 
 
-def test_1():
-    print("hello")
-    return "x"
