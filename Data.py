@@ -2,8 +2,7 @@
 import pyreadr
 import pandas as pd
 from collections import OrderedDict
-from Functions import split_df_on_symbol
-from Functions import merge_df_on_vol_columns
+from Functions import split_df_on_symbol, merge_df_on_vol_columns
 from datetime import datetime
 
 # %%
@@ -95,47 +94,8 @@ columns_to_rename = {
 
 #%%
 
-## Initialize dictionary containing merged volume and return data
-etf_merged_30min_daily_dict = {}
-
-for key in etf_shvol_vol_30min_dict.keys():
-
-    df1 = etf_prices_30min_dict[key]
-    df2 = etf_shvol_vol_30min_dict[key]
-
-    date_threshold = max(
-        df1["DATE"][0], df2["DATE"][0]
-    )  # Specify date threshold, based on earliest available data in either prices or volume
-    df1 = df1[df1["DATE"] >= date_threshold]
-    df2 = df2[df2["DATE"] >= date_threshold]
-
-    df1.reset_index(drop=True, inplace=True)
-    df2.reset_index(drop=True, inplace=True)
-    merged_df = df2.copy()
-
-    for column_name in new_columns:
-
-        hour = int(column_name.split("_")[1][:2])
-
-        time = datetime.strptime(
-            f"{hour + 1}:00:00" if "second" in column_name else f"{hour}:30:00",
-            "%H:%M:%S",
-        ).time()
-
-        temp_df = pd.merge(df2, df1[df1["TIME"] == time], on="DATE", how="left")
-
-        merged_df[column_name] = temp_df["RETURN"]
-
-    merged_df.rename(columns=columns_to_rename, inplace=True)
-    
-
-    etf_merged_30min_daily_dict[key] = merged_df
-
-
-#%%
-
-
-test1_dict = merge_df_on_vol_columns(
+## Merge using the function
+etf_merged_30min_daily_dict = merge_df_on_vol_columns(
     etf_prices_30min_dict,
     etf_shvol_vol_30min_dict,
     new_columns,
@@ -143,3 +103,5 @@ test1_dict = merge_df_on_vol_columns(
     "DATE",
     "TIME",
     "RETURN")
+
+# %%
