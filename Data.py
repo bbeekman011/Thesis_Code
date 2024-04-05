@@ -2,10 +2,16 @@
 import pyreadr
 import pandas as pd
 from collections import OrderedDict
-from Functions import split_df_on_symbol, merge_df_on_vol_columns, get_column_name, merge_df_on_price_rows
+from Functions import (
+    split_df_on_symbol,
+    merge_df_on_vol_columns,
+    merge_df_on_price_rows,
+)
 from datetime import datetime
 import numpy as np
 import time as tm
+import pickle
+
 # %%
 ## Specify paths
 sample_path_etf_prices_30min = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\ETF_prices_30min.rds"
@@ -107,54 +113,24 @@ etf_merged_30min_daily_dict = merge_df_on_vol_columns(
 )
 
 # %%
-# Specify the column names of the (short) volume data
-col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
+# ## If nothing is changed in the source data, get this dictionary from the pickle file, see two cells below.
+# # Specify the column names of the (short) volume data
+# col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
 
-## Merge using the relevant function
-etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
-    etf_shvol_vol_30min_dict,
-    etf_prices_30min_dict,
-    'DATE',
-    'TIME',
-    col_name_list
-)
+# ## Merge using the relevant function
+# etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
+#     etf_shvol_vol_30min_dict, etf_prices_30min_dict, "DATE", "TIME", col_name_list
+# )
 
-        
-
-    
 
 # %%
-start_time = tm.time()
-merge_dict = etf_shvol_vol_30min_dict
-merger_dict = etf_prices_30min_dict
-date_string = "DATE"
-time_string = "TIME"
-col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
-key = "QQQ"
-# Precompute date and time arrays
-dates = merger_dict[key][date_string].values
-times = merger_dict[key][time_string].values
-
-for col_name in col_name_list:
-    # Precompute column names
-    column_names = [get_column_name(time, col_name) for time in times]
-    mask = np.array([col_name is not None for col_name in column_names])
-
-    # Filter out None column names and corresponding dates
-    valid_dates = dates[mask]
-    valid_column_names = np.array(column_names)[mask]
-
-    # Filter merge_dict[key] based on dates
-    merge_dict_key_dates = merge_dict[key][merge_dict[key][date_string].isin(valid_dates)]
-
-    # Iterate only through valid indices
-    for i, date, column_name in zip(range(len(merger_dict[key])), valid_dates, valid_column_names):
-        value = merge_dict_key_dates.loc[merge_dict_key_dates[date_string] == date, column_name].iloc[0]
-        merger_dict[key].at[i, col_name] = value
-
-merger_dict[key]
 
 
-
-
+# # Save the current 30-minute interval dictionary to a pickle
+# with open("etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
+#     pickle.dump(etf_merged_30min_halfhourly_dict, f)
+# %%
+# Loading dictionary from a file
+with open("etf_merged_30min_halfhourly_dict.pkl", "rb") as f:
+    etf_merged_30min_halfhourly_dict = pickle.load(f)
 # %%
