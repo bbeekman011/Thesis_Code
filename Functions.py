@@ -128,3 +128,51 @@ def get_column_name(time, category):
         return f"{category}_LH"
     else:
         return None
+
+
+def merge_df_on_price_rows(
+    merge_dict: dict,
+    merger_dict: dict,
+    date_string: str,
+    time_string: str,
+    col_name_list: list,
+):
+    """This function merges the dataframe containing (short) volume data by day and merges with a dataframe with 30-minute price  intervals on the rows
+    Parameters:
+    merge_dict (dictionary): dictionary of dataframes with (short) volume data, to merge with other dictionary    dictionary of dataframes with price data
+    merger_dict (dictionary):  dictionary of dataframes with price data, merge_dict will be merged into this dictionary
+    date_string (string): Name of the column in the dataframes inside the two input dictionaries. Note that these should be the same for the merge_dict and merger_dict
+    time_string (string): Name of the column in the merger_dict dataframes corresponding to time.
+    col_name_list (list): List of column names, following the naming convention (without specification) of the (short) volume data, these columns will be added to the price dataframe
+
+    Returns:
+    output_dict (dictionary): dictionary containing dataframes price data with (short) volume data added for each 30-minute interval
+    """
+    
+    import numpy as np
+
+    output_dict = merger_dict.copy()
+
+    for key in output_dict.keys():
+        # Precompute date and time arrays
+        dates = output_dict[key][date_string].values
+        times = output_dict[key][time_string].values
+
+        for col_name in col_name_list:
+            # Precompute column names
+            column_names = [get_column_name(time, col_name) for time in times]
+            mask = np.array([col_name is not None for col_name in column_names])
+
+            # Filter out None column names and corresponding dates
+            valid_dates = dates[mask]
+            valid_column_names = np.array(column_names)[mask]
+
+            # Filter merge_dict[key] based on dates
+            merge_dict_key_dates = merge_dict[key][merge_dict[key][date_string].isin(valid_dates)]
+
+            # Iterate through valid indices
+            for i, date, column_name in zip(range(len(output_dict[key])), valid_dates, valid_column_names):
+                value = merge_dict_key_dates.loc[merge_dict_key_dates[date_string] == date, column_name].iloc[0]
+                output_dict[key].at[i, col_name] = value
+    
+    return output_dict
