@@ -12,7 +12,6 @@ def split_df_on_symbol(df, symbol_tag: str):
     Dictionary: Contains a separate dataframe for each symbol (key)
     """
 
-    
     output_dict = {}
     column_list = df.columns.tolist()
     column_list.remove(symbol_tag)
@@ -25,7 +24,6 @@ def split_df_on_symbol(df, symbol_tag: str):
     return output_dict
 
 
-
 def merge_df_on_vol_columns(
     merge_dict: dict,
     merger_dict: dict,
@@ -33,9 +31,8 @@ def merge_df_on_vol_columns(
     rename_col_dict: dict,
     date_string: str,
     time_string: str,
-    return_string: str
+    return_string: str,
 ):
-    
     """This function merges the dataframe containing 30-minute price and return data and merges with a dataframe containing (short) volume data by day in 30 minute intervals by column
     Parameters:
     merge_dict (dictionary): dictionary of dataframes with price data, to merge with other dictionary
@@ -49,16 +46,14 @@ def merge_df_on_vol_columns(
     Returns:
     output_dict (dictionary): dictionary containing dataframes with volume value and price or other return data added
     """
-    
-    
+
     from datetime import datetime
     import pandas as pd
-
 
     output_dict = {}
 
     for key in merger_dict.keys():
-        
+
         df1 = merge_dict[key]
         df2 = merger_dict[key]
 
@@ -89,7 +84,95 @@ def merge_df_on_vol_columns(
         merged_df.rename(columns=rename_col_dict, inplace=True)
 
         output_dict[key] = merged_df
-    
+
     return output_dict
 
 
+def get_column_name(time, category):
+    """This function just hardcodes the shit out of a tough issue, apologies, it's terrible
+    Parameters:
+    time (datetime): input time to be linked to a column name
+    category (string): name of the category the value needs to be taken from
+    here specifically options are (Short, Short_dollar, Volume, Volume_dollar)
+    Returns:
+    string corresponding to correct column name in volume data
+    """
+
+    if time == pd.to_datetime("09:30:00").time():
+        return f"{category}_9first"
+    elif time == pd.to_datetime("10:00:00").time():
+        return f"{category}_FH"
+    elif time == pd.to_datetime("10:30:00").time():
+        return f"{category}_10first"
+    elif time == pd.to_datetime("11:00:00").time():
+        return f"{category}_10second"
+    elif time == pd.to_datetime("11:30:00").time():
+        return f"{category}_11first"
+    elif time == pd.to_datetime("12:00:00").time():
+        return f"{category}_11second"
+    elif time == pd.to_datetime("12:30:00").time():
+        return f"{category}_12first"
+    elif time == pd.to_datetime("13:00:00").time():
+        return f"{category}_12second"
+    elif time == pd.to_datetime("13:30:00").time():
+        return f"{category}_13first"
+    elif time == pd.to_datetime("14:00:00").time():
+        return f"{category}_13second"
+    elif time == pd.to_datetime("14:30:00").time():
+        return f"{category}_14first"
+    elif time == pd.to_datetime("15:00:00").time():
+        return f"{category}_14second"
+    elif time == pd.to_datetime("15:30:00").time():
+        return f"{category}_SLH"
+    elif time == pd.to_datetime("16:00:00").time():
+        return f"{category}_LH"
+    else:
+        return None
+
+
+def merge_df_on_price_rows(
+    merge_dict: dict,
+    merger_dict: dict,
+    date_string: str,
+    time_string: str,
+    col_name_list: list,
+):
+    """This function merges the dataframe containing (short) volume data by day and merges with a dataframe with 30-minute price  intervals on the rows
+    Parameters:
+    merge_dict (dictionary): dictionary of dataframes with (short) volume data, to merge with other dictionary    dictionary of dataframes with price data
+    merger_dict (dictionary):  dictionary of dataframes with price data, merge_dict will be merged into this dictionary
+    date_string (string): Name of the column in the dataframes inside the two input dictionaries. Note that these should be the same for the merge_dict and merger_dict
+    time_string (string): Name of the column in the merger_dict dataframes corresponding to time.
+    col_name_list (list): List of column names, following the naming convention (without specification) of the (short) volume data, these columns will be added to the price dataframe
+
+    Returns:
+    output_dict (dictionary): dictionary containing dataframes price data with (short) volume data added for each 30-minute interval
+    """
+    
+    import numpy as np
+
+    output_dict = merger_dict.copy()
+
+    for key in output_dict.keys():
+        # Precompute date and time arrays
+        dates = output_dict[key][date_string].values
+        times = output_dict[key][time_string].values
+
+        for col_name in col_name_list:
+            # Precompute column names
+            column_names = [get_column_name(time, col_name) for time in times]
+            mask = np.array([col_name is not None for col_name in column_names])
+
+            # Filter out None column names and corresponding dates
+            valid_dates = dates[mask]
+            valid_column_names = np.array(column_names)[mask]
+
+            # Filter merge_dict[key] based on dates
+            merge_dict_key_dates = merge_dict[key][merge_dict[key][date_string].isin(valid_dates)]
+
+            # Iterate through valid indices
+            for i, date, column_name in zip(range(len(output_dict[key])), valid_dates, valid_column_names):
+                value = merge_dict_key_dates.loc[merge_dict_key_dates[date_string] == date, column_name].iloc[0]
+                output_dict[key].at[i, col_name] = value
+    
+    return output_dict

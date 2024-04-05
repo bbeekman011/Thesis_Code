@@ -2,8 +2,15 @@
 import pyreadr
 import pandas as pd
 from collections import OrderedDict
-from Functions import split_df_on_symbol, merge_df_on_vol_columns
+from Functions import (
+    split_df_on_symbol,
+    merge_df_on_vol_columns,
+    merge_df_on_price_rows,
+)
 from datetime import datetime
+import numpy as np
+import time as tm
+import pickle
 
 # %%
 ## Specify paths
@@ -92,7 +99,7 @@ columns_to_rename = {
     "Return_15second": "Return_LH",
 }
 
-#%%
+# %%
 
 ## Merge using the function
 etf_merged_30min_daily_dict = merge_df_on_vol_columns(
@@ -102,6 +109,28 @@ etf_merged_30min_daily_dict = merge_df_on_vol_columns(
     columns_to_rename,
     "DATE",
     "TIME",
-    "RETURN")
+    "RETURN",
+)
 
+# %%
+# ## If nothing is changed in the source data, get this dictionary from the pickle file, see two cells below.
+# # Specify the column names of the (short) volume data
+# col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
+
+# ## Merge using the relevant function
+# etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
+#     etf_shvol_vol_30min_dict, etf_prices_30min_dict, "DATE", "TIME", col_name_list
+# )
+
+
+# %%
+
+
+# # Save the current 30-minute interval dictionary to a pickle
+# with open("etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
+#     pickle.dump(etf_merged_30min_halfhourly_dict, f)
+# %%
+# Loading dictionary from a file
+with open("etf_merged_30min_halfhourly_dict.pkl", "rb") as f:
+    etf_merged_30min_halfhourly_dict = pickle.load(f)
 # %%
