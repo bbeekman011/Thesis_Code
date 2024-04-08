@@ -148,7 +148,7 @@ def merge_df_on_price_rows(
     Returns:
     output_dict (dictionary): dictionary containing dataframes price data with (short) volume data added for each 30-minute interval
     """
-    
+
     import numpy as np
 
     output_dict = merger_dict.copy()
@@ -168,46 +168,52 @@ def merge_df_on_price_rows(
             valid_column_names = np.array(column_names)[mask]
 
             # Filter merge_dict[key] based on dates
-            merge_dict_key_dates = merge_dict[key][merge_dict[key][date_string].isin(valid_dates)]
+            merge_dict_key_dates = merge_dict[key][
+                merge_dict[key][date_string].isin(valid_dates)
+            ]
 
             # Iterate through valid indices
-            for i, date, column_name in zip(range(len(output_dict[key])), valid_dates, valid_column_names):
-                value = merge_dict_key_dates.loc[merge_dict_key_dates[date_string] == date, column_name].iloc[0]
+            for i, date, column_name in zip(
+                range(len(output_dict[key])), valid_dates, valid_column_names
+            ):
+                value = merge_dict_key_dates.loc[
+                    merge_dict_key_dates[date_string] == date, column_name
+                ].iloc[0]
                 output_dict[key].at[i, col_name] = value
-    
+
     return output_dict
 
 
 def fill_missing_intervals(df):
-
+    """This function loops through a dataframe with the format of dates and times in rows below each other. 
+    It checks if each date present in the data set has all 30 minute intervals between 09:30:00 and 16:00:00 present and if not, it adds these. 
+    Missing values are filled forward."""
+    
     merged_dfs = []
-        # Create a list of all possible half-hour intervals between 09:30:00 and 16:00:00
-    all_intervals = pd.date_range(start='09:30:00', end='16:00:00', freq='30min').time
+    # Create a list of all possible half-hour intervals between 09:30:00 and 16:00:00
+    all_intervals = pd.date_range(start="09:30:00", end="16:00:00", freq="30min").time
 
-    for date in df['DATE'].unique():
+    for date in df["DATE"].unique():
         # Filter DataFrame for the current date
-        date_df = df[df['DATE'] == date]
-        
+        date_df = df[df["DATE"] == date]
+
         # Create a DataFrame with all possible half-hour intervals for the current date
-        all_intervals_df = pd.DataFrame({'TIME': all_intervals})
-        all_intervals_df['DATE'] = date
-        
+        all_intervals_df = pd.DataFrame({"TIME": all_intervals})
+        all_intervals_df["DATE"] = date
+
         # Merge with the original DataFrame for the current date to fill in missing intervals
-        merged = pd.merge(all_intervals_df, date_df, on='TIME', how='left')
-        
+        merged = pd.merge(all_intervals_df, date_df, on="TIME", how="left")
+
         # Fill missing values (NaNs) forward
-        merged['PRICE'] = merged['PRICE'].ffill()
+        merged["PRICE"] = merged["PRICE"].ffill()
 
         merged_dfs.append(merged)
-    
+
     output_df = pd.concat(merged_dfs, ignore_index=True)
-    
+
     ## Drop irrelevant columns, change names and reorder
-    output_df = output_df.drop(columns=['DT', 'DATE_y'])
-    output_df = output_df.rename(
-    columns={"DATE_x": "DATE"}
-    )
-    output_df = output_df.reindex(columns=['DATE', 'TIME', 'PRICE'])
-    
-    
+    output_df = output_df.drop(columns=["DT", "DATE_y"])
+    output_df = output_df.rename(columns={"DATE_x": "DATE"})
+    output_df = output_df.reindex(columns=["DATE", "TIME", "PRICE"])
+
     return output_df
