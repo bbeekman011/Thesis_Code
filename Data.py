@@ -6,8 +6,9 @@ from Functions import (
     split_df_on_symbol,
     merge_df_on_vol_columns,
     merge_df_on_price_rows,
+    fill_missing_intervals,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import time as tm
 import pickle
@@ -54,6 +55,13 @@ for key, df in etf_prices_30min_dict.items():
 
     df = df.reindex(columns=["DT", "DATE", "TIME", "PRICE"])  # Reorder columns
     etf_prices_30min_dict[key] = df
+
+
+# %%
+# Fill in all missing 30 minute intervals, use fill forward to fill missing prices
+for key in etf_prices_30min_dict.keys():
+    etf_prices_30min_dict[key] = fill_missing_intervals(etf_prices_30min_dict[key])
+
 
 # %%
 
@@ -113,24 +121,44 @@ etf_merged_30min_daily_dict = merge_df_on_vol_columns(
 )
 
 # %%
-# ## If nothing is changed in the source data, get this dictionary from the pickle file, see two cells below.
-# # Specify the column names of the (short) volume data
-# col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
+## If nothing is changed in the source data, get this dictionary from the pickle file, see two cells below.
+# Specify the column names of the (short) volume data
+col_name_list = ["Short", "Short_dollar", "Volume", "Volume_dollar"]
 
-# ## Merge using the relevant function
-# etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
-#     etf_shvol_vol_30min_dict, etf_prices_30min_dict, "DATE", "TIME", col_name_list
-# )
-
-
-# %%
+## Merge using the relevant function
+etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
+    etf_shvol_vol_30min_dict, etf_prices_30min_dict, "DATE", "TIME", col_name_list
+)
 
 
-# # Save the current 30-minute interval dictionary to a pickle
-# with open("etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
-#     pickle.dump(etf_merged_30min_halfhourly_dict, f)
 # %%
 # Loading dictionary from a file
 with open("etf_merged_30min_halfhourly_dict.pkl", "rb") as f:
     etf_merged_30min_halfhourly_dict = pickle.load(f)
+# %%
+######## Create some measures for short-selling pressure or flow.
+
+
+## Short Ratio, following Boehmer et al. (2008) generally, and Hu et al. (2021) specifically for 30 minute intervals
+for key in etf_merged_30min_halfhourly_dict.keys():
+    etf_merged_30min_halfhourly_dict[key]["Short_Ratio"] = (
+        etf_merged_30min_halfhourly_dict[key]["Short"]
+        / etf_merged_30min_halfhourly_dict[key]["Volume"]
+    )
+
+
+# ## ETF flow measure, following Brown et al. (2021), they do it for daily flows. To be determined if it makes sense to calculate 30-minute flows.
+# for key in etf_merged_30min_halfhourly_dict.keys():
+
+# %%
+# %%
+# Save the current 30-minute interval dictionary to a pickle
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
+    pickle.dump(etf_merged_30min_halfhourly_dict, f)
+
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl", "wb") as f:
+    pickle.dump(etf_merged_30min_daily_dict, f)
+
+
+
 # %%
