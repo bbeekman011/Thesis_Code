@@ -185,10 +185,10 @@ def merge_df_on_price_rows(
 
 
 def fill_missing_intervals(df):
-    """This function loops through a dataframe with the format of dates and times in rows below each other. 
-    It checks if each date present in the data set has all 30 minute intervals between 09:30:00 and 16:00:00 present and if not, it adds these. 
+    """This function loops through a dataframe with the format of dates and times in rows below each other.
+    It checks if each date present in the data set has all 30 minute intervals between 09:30:00 and 16:00:00 present and if not, it adds these.
     Missing values are filled forward."""
-    
+
     merged_dfs = []
     # Create a list of all possible half-hour intervals between 09:30:00 and 16:00:00
     all_intervals = pd.date_range(start="09:30:00", end="16:00:00", freq="30min").time
@@ -212,8 +212,74 @@ def fill_missing_intervals(df):
     output_df = pd.concat(merged_dfs, ignore_index=True)
 
     ## Drop irrelevant columns, change names and reorder
-    output_df = output_df.drop(columns=["DT", "DATE_y"])
+    output_df["DT"] = pd.to_datetime(
+        output_df["DATE_x"].astype(str) + " " + output_df["TIME"].astype(str)
+    )
+    output_df = output_df.drop(columns=["DATE_y"])
     output_df = output_df.rename(columns={"DATE_x": "DATE"})
-    output_df = output_df.reindex(columns=["DATE", "TIME", "PRICE"])
+    output_df = output_df.reindex(columns=["DT", "DATE", "TIME", "PRICE"])
 
     return output_df
+
+
+
+def intraday_plot(
+        df, 
+        dt_col: str,
+        date_col: str,
+        start_date: str,
+        end_date: str,
+        fig_title: str,
+        y_ax1_col: str,
+        y_ax1_label: str,
+        y_ax1_title: str,
+        y_ax2_col = None,
+        y_ax2_label = None,
+        y_ax2_title = None,
+        mode = 'lines',
+        x_ax_title = 'Date',
+        ):
+    
+    import pandas as pd
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    ## Get the correct range in the data
+    df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)].reset_index(drop=True)
+
+
+    ## Check if a second axis is necessary, add two traces if so
+    if not y_ax2_col is None and not y_ax2_label is None and not y_ax2_title is None:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        fig.add_trace(
+            go.Scatter(x=df[dt_col], y=df[y_ax1_col], mode=mode, name=y_ax1_label),
+            secondary_y=False,
+        )
+
+        fig.add_trace(
+            go.Scatter(x=df[dt_col], y=df[y_ax2_col], mode=mode, name=y_ax2_label),
+            secondary_y=True,
+        )
+
+        # Add y-axes titles
+        fig.update_yaxes(title_text=y_ax1_title, secondary_y=False)
+        fig.update_yaxes(title_text=y_ax2_title, secondary_y=True)
+
+    else:
+        fig = go.Figure(data=go.Scatter(x=df[dt_col], y=df[y_ax1_col], mode=mode))
+
+        # Add y-axis title
+        fig.update_yaxes(title_text=y_ax1_title)
+    
+    # Don't show data points outside of trading hours, remove weekends
+    fig.update_xaxes(rangebreaks=[dict(bounds=[16.5, 9], pattern='hour'),
+                                  dict(bounds=['sat', 'mon'])], title_text=x_ax_title)
+
+    # Update titles
+    fig.update_layout(title=fig_title)
+
+
+    return fig
+
+

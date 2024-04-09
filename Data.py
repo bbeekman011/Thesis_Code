@@ -18,7 +18,7 @@ import pickle
 sample_path_etf_prices_30min = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\ETF_prices_30min.rds"
 sample_path_etf_shvol_30min = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\ETF_shvol_30min.rds"
 sample_path_etf_vol_30min = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\ETF_vol_30min.rds"
-sample_path_us_auctions = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\Bloomberg_releases_US_updated_2024.xlsx"
+sample_path_us_auctions = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\US auctions.xlsx"
 sample_path_us_releases = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\Bloomberg_releases_US_updated_2024.xlsx"
 sample_path_ty = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\TY.csv"
 
@@ -131,10 +131,10 @@ etf_merged_30min_halfhourly_dict = merge_df_on_price_rows(
 )
 
 
-# %%
-# Loading dictionary from a file
-with open("etf_merged_30min_halfhourly_dict.pkl", "rb") as f:
-    etf_merged_30min_halfhourly_dict = pickle.load(f)
+# # %%
+# # Loading dictionary from a file
+# with open("etf_merged_30min_halfhourly_dict.pkl", "rb") as f:
+#     etf_merged_30min_halfhourly_dict = pickle.load(f)
 # %%
 ######## Create some measures for short-selling pressure or flow.
 
