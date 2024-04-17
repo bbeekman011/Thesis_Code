@@ -78,25 +78,27 @@ etf_sel_daily = {key: etf_merged_30min_daily_dict[key] for key in included_etfs 
 etf_sel_halfhourly = {key: etf_merged_30min_halfhourly_dict[key] for key in included_etfs if key in etf_merged_30min_halfhourly_dict}
 
 #%%
-df = etf_sel_halfhourly['TLT']
-start_date = '2020-01-01' 
-end_date = '2022-12-31'
-title = 'Test'
-y_1 = 'PRICE'
-y_2 = 'Short_Ratio'
+## Make time series plot for specific period and variables
+df = etf_sel_halfhourly['SPY']
+start_date = '2018-02-05' 
+end_date = '2018-02-09'
+title = 'SPY'
+y_1 = 'Short'
+# y_2 = 'Short'
 
 
-test_fig = intraday_plot(df, 'DT', 'DATE', start_date, end_date, title, y_1, "Price", 'Price', y_2, 'Short Ratio', 'Short Ratio')
+test_fig = intraday_plot(df, 'DT', 'DATE', start_date, end_date, title, y_1, "Short Volume", 'Short Volume')
 test_fig.show()
 # %%
-
+## Get years and weekdays column in dataframes
 
 for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key]['YEAR'] = etf_sel_halfhourly[key]['DT'].dt.year
-
+    etf_sel_halfhourly[key]['Weekday'] = etf_sel_halfhourly[key]['DT'].dt.day_name() 
 # %%
+## Get plots per year 
 grouped = etf_sel_halfhourly['SPY'].groupby(['YEAR', pd.Grouper(key='DT', freq='30T')])['Short'].mean().reset_index()
-#%%
+
 years = grouped['YEAR'].unique()
 for year in years:
     year_data = grouped[grouped['YEAR'] == year]
@@ -108,20 +110,9 @@ for year in years:
     plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
     plt.tight_layout()
     plt.show()
-# %%
 
-for key in etf_sel_halfhourly.keys():
-    grouped = etf_sel_halfhourly[key].groupby(pd.Grouper(key='DT', freq='30T'))['Short'].mean().reset_index()
-
-    plt.figure(figsize=(10, 6))  # Adjust figure size as needed
-    plt.bar(grouped['DT'].dt.strftime('%H:%M'), grouped['Short'])
-    plt.title(f'Average Short Volume per 30-minute Interval - {key}')
-    plt.xlabel('Time')
-    plt.ylabel('Average Short Volume')
-    plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
-    plt.tight_layout()
-    plt.show()
 # %%
+## Plot short volume for selected tickers
 for key in etf_sel_halfhourly.keys():
 
     df_grouped = etf_sel_halfhourly[key].groupby(etf_sel_halfhourly[key]['TIME'])['Short'].mean().reset_index()
@@ -136,6 +127,7 @@ for key in etf_sel_halfhourly.keys():
     plt.show()
 
 # %%
+## Plot volume for selected tickers
 for key in etf_sel_halfhourly.keys():
 
     df_grouped = etf_sel_halfhourly[key].groupby(etf_sel_halfhourly[key]['TIME'])['Volume'].mean().reset_index()
@@ -150,6 +142,7 @@ for key in etf_sel_halfhourly.keys():
     plt.show()
 
 # %%
+## Plot short ratio for selected tickers
 for key in etf_sel_halfhourly.keys():
 
     df_grouped = etf_sel_halfhourly[key].groupby(etf_sel_halfhourly[key]['TIME'])['Short_Ratio'].mean().reset_index()
@@ -162,3 +155,75 @@ for key in etf_sel_halfhourly.keys():
     plt.title(f'Average Short_Ratio Volume per half hour - {key}')
     plt.xticks(rotation=45)
     plt.show()
+
+# %%
+ticker = 'TLT'
+## Get average volume per weekday
+df = etf_sel_halfhourly[ticker]
+# Define the order of weekdays
+weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
+# Calculate daily averages
+daily_avg = df.groupby('Weekday')['Short'].mean().reindex(weekday_order)
+plt.bar(daily_avg.index, daily_avg.values)
+plt.xlabel('Day')
+plt.ylabel('Average Short Volume')
+plt.title(f'Average Short volume per day - {ticker}')
+plt.show()
+
+df = etf_sel_halfhourly[ticker]
+## Get average volume on specific weekdays
+start_time = pd.Timestamp('09:30:00')
+end_time = pd.Timestamp('16:00:00')
+weekday_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
+# Generate intervals programmatically
+interval_length = pd.Timedelta(minutes=30)
+intervals = pd.date_range(start=start_time, end=end_time, freq=interval_length).strftime('%H:%M:%S')
+
+# Function to calculate average value for each interval for all weekdays
+def interval_avg_for_all_weekdays(df):
+    avg_per_interval = {}
+    for interval in intervals:
+        avg_per_interval[interval] = df[df['TIME'] == interval].groupby('Weekday')['Short'].mean().reindex(weekday_order)
+    return avg_per_interval
+
+# Calculate average value for each interval for all weekdays
+avg_per_interval = interval_avg_for_all_weekdays(df)
+
+# Plotting the bar plot
+fig, ax = plt.subplots(figsize=(12, 6))
+
+# Define colors for each weekday
+colors = ['blue', 'orange', 'green', 'red', 'purple']
+
+# Plot each interval for all weekdays separately
+for i, interval in enumerate(intervals):
+    # Get average values for the interval
+    avg_values = avg_per_interval[interval]
+    # Plot each weekday as a separate bar with a different color
+    for j, (day, avg) in enumerate(avg_values.items()):
+        ax.bar(i + j * 0.1, avg, width=0.1, label=day, color=colors[j])
+
+ax.set_xlabel('Interval')
+ax.set_ylabel('Short Volume')
+ax.set_title(f'Average Short Volume per day - {ticker}')
+
+# Create a legend with each weekday appearing only once
+handles, labels = ax.get_legend_handles_labels()
+unique_labels = []
+unique_handles = []
+for handle, label in zip(handles, labels):
+    if label not in unique_labels:
+        unique_labels.append(label)
+        unique_handles.append(handle)
+ax.legend(unique_handles, unique_labels, title='Weekday', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Set x-axis ticks and labels
+ax.set_xticks(range(len(intervals)))
+ax.set_xticklabels(intervals, rotation=45)
+
+plt.tight_layout()
+plt.show()
+
+# %%
