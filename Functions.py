@@ -283,3 +283,21 @@ def intraday_plot(
     return fig
 
 
+
+def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
+
+    output_df = df.copy()
+    for suffix in suffix_list:
+
+        input_col_full_1 = f'{input_col1}_{suffix}'
+        input_col_full_2 = f'{input_col2}_{suffix}'
+
+        new_col_full = f'{new_col}_{suffix}'
+
+        output_df[new_col_full] = func(output_df[input_col_full_1], output_df[input_col_full_2])
+    
+    return output_df
+
+
+
+
