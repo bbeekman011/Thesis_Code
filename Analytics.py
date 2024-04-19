@@ -10,6 +10,7 @@ from Functions import (
     fill_missing_intervals,
     intraday_plot,
     add_daily_cols,
+    get_eventday_plots
 )
 from datetime import datetime, timedelta
 import numpy as np
@@ -21,6 +22,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
+import os
 
 # %%
 ## Load data pre-processed through Data file
@@ -39,6 +41,38 @@ with open(
 ) as f:
     etf_merged_30min_halfhourly_dict = pickle.load(f)
 
+etf_dict = {
+    'AGG': 'iShares Core U.S. Aggregate Bond ETF',
+    'BND': 'Vanguard Total Bond Market ETF',
+    'DIA': 'SPDR Dow Jones Industrial Average ETF Trust',
+    'EEM': 'iShares MSCI Emerging Markets ETF',
+    'EFA': 'iShares MSCI EAFE ETF',
+    'FXI': 'iShares China Large-Cap ETF',
+    'HYG': 'iShares iBoxx $ High Yield Corporate Bond ETF',
+    'IEF': 'iShares 7-10 Year Treasury Bond ETF',
+    'IWM': 'iShares Russell 2000 ETF',
+    'IYR': 'iShares U.S. Real Estate ETF',
+    'LQD': 'iShares iBoxx $ Investment Grade Corporate Bond ETF',
+    'QQQ': 'Invesco QQQ Trust Series I (Nasdaq)',
+    'SHY': 'iShares 1-3 Year Treasury Bond ETF',
+    'SPY': 'SPDR S&P 500 ETF Trust',
+    'TLT': 'iShares 20+ Year Treasury Bond ETF',
+    'USHY': 'iShares Broad USD High Yield Corporate Bond ETF',
+    'VCIT': 'Vanguard Intermediate-Term Corporate Bond ETF',
+    'VCSH': 'Vanguard Short-Term Corporate Bond ETF',
+    'VWO': 'Vanguard FTSE Emerging Markets ETF',
+    'XLB': 'Materials Select Sector SPDR Fund',
+    'XLC': 'Communication Services Select Sector SPDR Fund',
+    'XLE': 'Energy Select Sector SPDR Fund',
+    'XLF': 'Financial Select Sector SPDR Fund',
+    'XLI': 'Industrial Select Sector SPDR Fund',
+    'XLK': 'Technology Select Sector SPDR Fund',
+    'XLP': 'Consumer Staples Select Sector SPDR Fund',
+    'XLRE': 'Real Estate Select Sector SPDR Fund',
+    'XLU': 'Utilities Select Sector SPDR Fund',
+    'XLV': 'Health Care Select Sector SPDR Fund',
+    'XLY': 'Consumer Discretionary Select Sector SPDR Fund'
+}
 
 # %%
 # Get rid of short ratio in 09:30:00 column and of infinite values (temporary fix for infinite values until discussed further)
@@ -69,18 +103,16 @@ etf_sel_halfhourly = {
 }
 
 
-
-
 # %%
 ## Make time series plot for specific period and variables
 ticker = "IEF"
 df = etf_sel_halfhourly[ticker]
-start_date = "2022-01-25"
-end_date = "2022-01-27"
+start_date = "2022-04-01"
+end_date = "2022-04-05"
 title = ticker
 y_1 = "Short_Ratio"
 y_2 = "PRICE"
-vert_line = "2022-01-26 14:00:00"
+vert_line = "2022-04-02 14:00:00"
 
 
 test_fig = intraday_plot(
@@ -101,36 +133,78 @@ test_fig = intraday_plot(
 test_fig.show()
 
 
-#%%
-test_fig.write_image(f"Plots/test_fig.png")
-##%
+# %%
+name = "test_fig"
+test_fig.write_image(
+    rf"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/{name}.png"
+)
+# %%
 ## Loop through tickers, event dates
+
+# ## Events corresponding to some FOMC meetings, see specifics in the word file
+# event_dt_list = [
+#     "2020-03-03 14:00:00",
+#     "2022-01-26 14:00:00",
+#     "2022-03-16 14:00:00",
+#     "2022-05-04 14:00:00",
+#     "2022-06-15 14:00:00",
+#     "2022-07-27 14:00:00",
+#     "2022-09-21 14:00:00",
+#     "2022-11-02 14:00:00",
+#     "2022-12-14 14:00:00",
+# ]
+
+
+## Events correspdoning to some CPI announcements, see specifics in the word file
 event_dt_list = [
-    "03-03-2020 14:00:00",
-    "26-01-2022 14:00:00",
-    "16-03-2022 14:00:00",
-    "04-05-2022 14:00:00",
-    "15-06-2022 14:00:00",
-    "27-07-2022 14:00:00",
-    "21-09-2022 14:00:00",
-    "02-11-2022 14:00:00",
-    "14-12-2022 14:00:00"
+    "2021-05-12 08:30:00",
+    "2021-06-10 08:30:00",
+    "2021-07-13 08:30:00",
+    "2021-08-11 08:30:00",
+    "2021-09-14 08:30:00",
+    "2021-10-13 08:30:00",
+    "2021-11-10 08:30:00",
+    "2021-12-10 08:30:00",
+    "2022-01-12 08:30:00",
+    "2022-02-10 08:30:00",
+    "2022-03-10 08:30:00",
+    "2022-04-12 08:30:00",
+    "2022-05-11 08:30:00",
+    "2022-06-10 08:30:00",
+    "2022-07-13 08:30:00",
+    "2022-08-10 08:30:00",
+    "2022-09-13 08:30:00",
+    "2022-10-13 08:30:00",
+    "2022-11-10 08:30:00",
+    "2022-12-13 08:30:00"
 ]
 
-col_list = ['Short_Ratio', 'Short', 'Volume']
+
+col_list = ["Short_Ratio", "Short", "Volume"]
 y_2 = "PRICE"
 
+## Specify parent directory
+parent_dir = r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"
+
 for event_dt in event_dt_list:
+
+    # Create new directory for files to be stored in
+    event_date = pd.to_datetime(event_dt).strftime("%Y-%m-%d")
+    new_dir = event_date
+    path = os.path.join(parent_dir, new_dir)
+    if not os.path.exists(path):
+        os.mkdir(path)
+
     for ticker in included_etfs:
-        
+
         df = etf_sel_halfhourly[ticker]
         vert_line = event_dt
-        event_date = event_dt.strftime("%Y-%m-%d")
-        start_date = pd.to_datetime(event_dt) - pd.Timedelta(days=1)
+        
+        start_date = pd.to_datetime(event_dt) - pd.Timedelta(days=3)
         start_date = start_date.strftime("%Y-%m-%d")
-        end_date = pd.to_datetime(event_dt) + pd.Timedelta(days=1)
+        end_date = pd.to_datetime(event_dt) + pd.Timedelta(days=3)
         end_date = end_date.strftime("%Y-%m-%d")
-        title = ticker
+        title = f"{ticker} - {etf_dict[ticker]}"
         y_2 = "PRICE"
 
         for y_1 in col_list:
@@ -150,9 +224,9 @@ for event_dt in event_dt_list:
                 vert_line,
             )
 
-            fig.write_image(f"Plots/{event_date}_{ticker}_{y_1}.png")
-
-                    
+            fig.write_image(
+                rf"{path}/{event_date}_{ticker}_{y_1}_7day.png"
+            )
 
 
 # %%
@@ -483,4 +557,6 @@ for key in etf_sel_daily.keys():
     )
 # %%
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key]['Short_Ratio_fdiff'] = etf_sel_halfhourly[key]['Short_Ratio'].diff()
+    etf_sel_halfhourly[key]["Short_Ratio_fdiff"] = etf_sel_halfhourly[key][
+        "Short_Ratio"
+    ].diff()

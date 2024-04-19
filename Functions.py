@@ -222,32 +222,32 @@ def fill_missing_intervals(df):
     return output_df
 
 
-
 def intraday_plot(
-        df, 
-        dt_col: str,
-        date_col: str,
-        start_date: str,
-        end_date: str,
-        fig_title: str,
-        y_ax1_col: str,
-        y_ax1_label: str,
-        y_ax1_title: str,
-        y_ax2_col = None,
-        y_ax2_label = None,
-        y_ax2_title = None,
-        vertical_line = None,
-        mode = 'lines',
-        x_ax_title = 'Date',
-        ):
-    
+    df,
+    dt_col: str,
+    date_col: str,
+    start_date: str,
+    end_date: str,
+    fig_title: str,
+    y_ax1_col: str,
+    y_ax1_label: str,
+    y_ax1_title: str,
+    y_ax2_col=None,
+    y_ax2_label=None,
+    y_ax2_title=None,
+    vertical_line=None,
+    mode="lines",
+    x_ax_title="Date",
+):
+
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
 
     ## Get the correct range in the data
-    df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)].reset_index(drop=True)
-
+    df = df[(df[date_col] >= start_date) & (df[date_col] <= end_date)].reset_index(
+        drop=True
+    )
 
     ## Check if a second axis is necessary, add two traces if so
     if not y_ax2_col is None and not y_ax2_label is None and not y_ax2_title is None:
@@ -272,20 +272,24 @@ def intraday_plot(
 
         # Add y-axis title
         fig.update_yaxes(title_text=y_ax1_title)
-    
+
     # Don't show data points outside of trading hours, remove weekends
-    fig.update_xaxes(rangebreaks=[dict(bounds=[16.5, 9], pattern='hour'),
-                                  dict(bounds=['sat', 'mon'])], title_text=x_ax_title)
+    fig.update_xaxes(
+        rangebreaks=[
+            dict(bounds=[16.5, 9], pattern="hour"),
+            dict(bounds=["sat", "mon"]),
+        ],
+        title_text=x_ax_title,
+    )
 
     # Update titles
     fig.update_layout(title=fig_title)
 
     # Add vertical line if specified
-    if vertical_line: 
+    if vertical_line:
         fig.add_vline(x=vertical_line, line_dash="dash", line_color="green")
 
     return fig
-
 
 
 def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
@@ -293,15 +297,71 @@ def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
     output_df = df.copy()
     for suffix in suffix_list:
 
-        input_col_full_1 = f'{input_col1}_{suffix}'
-        input_col_full_2 = f'{input_col2}_{suffix}'
+        input_col_full_1 = f"{input_col1}_{suffix}"
+        input_col_full_2 = f"{input_col2}_{suffix}"
 
-        new_col_full = f'{new_col}_{suffix}'
+        new_col_full = f"{new_col}_{suffix}"
 
-        output_df[new_col_full] = func(output_df[input_col_full_1], output_df[input_col_full_2])
-    
+        output_df[new_col_full] = func(
+            output_df[input_col_full_1], output_df[input_col_full_2]
+        )
+
     return output_df
 
 
+def get_eventday_plots(
+    name_dict: dict,
+    input_dict: dict,
+    ticker_list: list,
+    event_dt_list: list,
+    y1_list: str,
+    y_2: str,
+    parent_dir: str,
+    day_range: int,
+):
+    import os
 
+    total_days = 2 * day_range + 1
 
+    for event_dt in event_dt_list:
+
+        # Create new directory for files to be stored in
+        event_date = pd.to_datetime(event_dt).strftime("%Y-%m-%d")
+        parent_dir = parent_dir
+        new_dir = event_date
+        path = os.path.join(parent_dir, new_dir)
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+        for ticker in ticker_list:
+
+            df = input_dict[ticker]
+            vert_line = event_dt
+
+            start_date = pd.to_datetime(event_dt) - pd.Timedelta(days=day_range)
+            start_date = start_date.strftime("%Y-%m-%d")
+            end_date = pd.to_datetime(event_dt) + pd.Timedelta(days=day_range)
+            end_date = end_date.strftime("%Y-%m-%d")
+            title = f"{ticker} - {name_dict[ticker]}"
+            y_2 = "PRICE"
+
+            for y_1 in y1_list:
+                fig = intraday_plot(
+                    df,
+                    "DT",
+                    "DATE",
+                    start_date,
+                    end_date,
+                    title,
+                    y_1,
+                    y_1,
+                    y_1,
+                    y_2,
+                    y_2,
+                    y_2,
+                    vert_line,
+                )
+
+                fig.write_image(
+                    rf"{path}/{event_date}_{ticker}_{y_1}_{total_days}day.png"
+                )
