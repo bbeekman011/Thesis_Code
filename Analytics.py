@@ -186,48 +186,10 @@ y_2 = "PRICE"
 ## Specify parent directory
 parent_dir = r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"
 
-for event_dt in event_dt_list:
 
-    # Create new directory for files to be stored in
-    event_date = pd.to_datetime(event_dt).strftime("%Y-%m-%d")
-    new_dir = event_date
-    path = os.path.join(parent_dir, new_dir)
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    for ticker in included_etfs:
-
-        df = etf_sel_halfhourly[ticker]
-        vert_line = event_dt
-        
-        start_date = pd.to_datetime(event_dt) - pd.Timedelta(days=3)
-        start_date = start_date.strftime("%Y-%m-%d")
-        end_date = pd.to_datetime(event_dt) + pd.Timedelta(days=3)
-        end_date = end_date.strftime("%Y-%m-%d")
-        title = f"{ticker} - {etf_dict[ticker]}"
-        y_2 = "PRICE"
-
-        for y_1 in col_list:
-            fig = intraday_plot(
-                df,
-                "DT",
-                "DATE",
-                start_date,
-                end_date,
-                title,
-                y_1,
-                y_1,
-                y_1,
-                y_2,
-                y_2,
-                y_2,
-                vert_line,
-            )
-
-            fig.write_image(
-                rf"{path}/{event_date}_{ticker}_{y_1}_7day.png"
-            )
-
+#%%
+## Get plots of the selected etfs for pre-defined day range and for selected variables in col_list
+get_eventday_plots(etf_dict, etf_sel_halfhourly, included_etfs, event_dt_list, col_list, y_2, parent_dir, 3)
 
 # %%
 ## Get years and weekdays column in dataframes
