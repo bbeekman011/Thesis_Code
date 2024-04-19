@@ -9,7 +9,7 @@ from Functions import (
     merge_df_on_price_rows,
     fill_missing_intervals,
     intraday_plot,
-    add_daily_cols
+    add_daily_cols,
 )
 from datetime import datetime, timedelta
 import numpy as np
@@ -68,16 +68,20 @@ etf_sel_halfhourly = {
     if key in etf_merged_30min_halfhourly_dict
 }
 
+#%%
+
+
 # %%
 ## Make time series plot for specific period and variables
-ticker = "IEF"
+ticker = "HYG"
 df = etf_sel_halfhourly[ticker]
-start_date = "2020-02-30"
-end_date = "2020-04-10"
+start_date = "2022-01-25"
+end_date = "2022-01-27"
 title = ticker
-y_1 = "Short_Ratio"
+y_1 = "Volume"
 y_2 = "PRICE"
-
+vert_line = "2022-01-26 14:00:00"
+vert_line_label = "FOMC Meeting"
 
 test_fig = intraday_plot(
     df,
@@ -87,13 +91,17 @@ test_fig = intraday_plot(
     end_date,
     title,
     y_1,
-    "Short_Ratio",
-    "Short_Ratio",
+    y_1,
+    y_1,
     y_2,
-    "Price",
-    "Price",
+    y_2,
+    y_2,
+    vert_line,
+    vert_line_label
 )
 test_fig.show()
+
+
 # %%
 ## Get years and weekdays column in dataframes
 
@@ -282,10 +290,20 @@ coeff = model.coef_
 print(f"R-squared: {r_sq}, intercept: {intercept}, coeff: {coeff}")
 
 # %%
+# Code for testing with regressions
 # included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
-ticker = "LQD"
-x = etf_sel_daily[ticker][["Return_FH", "Return_SLH"]].values
-# x = etf_sel_daily[ticker]['Return_FH'].values.reshape(-1, 1)
+ticker = "SHY"
+
+# Remove rows with nan or inf values
+
+etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
+etf_sel_daily[ticker] = (
+    etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
+)
+
+
+# x = etf_sel_daily[ticker][["Short_Ratio_FH", "Short_Ratio_10first"]].values
+x = etf_sel_daily[ticker]["Short_Ratio_SLH"].values.reshape(-1, 1)
 y = etf_sel_daily[ticker]["Return_LH"].values
 
 x = sm.add_constant(x)
@@ -382,9 +400,6 @@ def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
     return output_df
 
 
-
-
-
 # %%
 suffix_list = [
     "FH",
@@ -402,16 +417,17 @@ suffix_list = [
     "LH",
 ]
 
+
 def short_ratio(value1, value2):
     return value1 / value2
 
 
 # %%
+## Add short ratio to the 'daily' dataframes
 for key in etf_sel_daily.keys():
-    etf_sel_daily[key] = add_daily_cols(etf_sel_daily[key], suffix_list, short_ratio, 'Short', 'Volume', 'Short_Ratio')
-
-
-
-# df = add_daily_cols(df, suffix_list, short_ratio, 'Short', 'Volume', 'Short_Ratio')
-
+    etf_sel_daily[key] = add_daily_cols(
+        etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
+    )
 # %%
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key]['Short_Ratio_fdiff'] = etf_sel_halfhourly[key]['Short_Ratio'].diff()
