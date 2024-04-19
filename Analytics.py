@@ -68,19 +68,19 @@ etf_sel_halfhourly = {
     if key in etf_merged_30min_halfhourly_dict
 }
 
-#%%
+
 
 
 # %%
 ## Make time series plot for specific period and variables
-ticker = "HYG"
+ticker = "IEF"
 df = etf_sel_halfhourly[ticker]
-start_date = "2022-03-14"
-end_date = "2022-03-14"
+start_date = "2022-01-25"
+end_date = "2022-01-27"
 title = ticker
-y_1 = "Volume"
+y_1 = "Short_Ratio"
 y_2 = "PRICE"
-vert_line = "2022-03-14 14:00:00"
+vert_line = "2022-01-26 14:00:00"
 
 
 test_fig = intraday_plot(
@@ -99,6 +99,60 @@ test_fig = intraday_plot(
     vert_line,
 )
 test_fig.show()
+
+
+#%%
+test_fig.write_image(f"Plots/test_fig.png")
+##%
+## Loop through tickers, event dates
+event_dt_list = [
+    "03-03-2020 14:00:00",
+    "26-01-2022 14:00:00",
+    "16-03-2022 14:00:00",
+    "04-05-2022 14:00:00",
+    "15-06-2022 14:00:00",
+    "27-07-2022 14:00:00",
+    "21-09-2022 14:00:00",
+    "02-11-2022 14:00:00",
+    "14-12-2022 14:00:00"
+]
+
+col_list = ['Short_Ratio', 'Short', 'Volume']
+y_2 = "PRICE"
+
+for event_dt in event_dt_list:
+    for ticker in included_etfs:
+        
+        df = etf_sel_halfhourly[ticker]
+        vert_line = event_dt
+        event_date = event_dt.strftime("%Y-%m-%d")
+        start_date = pd.to_datetime(event_dt) - pd.Timedelta(days=1)
+        start_date = start_date.strftime("%Y-%m-%d")
+        end_date = pd.to_datetime(event_dt) + pd.Timedelta(days=1)
+        end_date = end_date.strftime("%Y-%m-%d")
+        title = ticker
+        y_2 = "PRICE"
+
+        for y_1 in col_list:
+            fig = intraday_plot(
+                df,
+                "DT",
+                "DATE",
+                start_date,
+                end_date,
+                title,
+                y_1,
+                y_1,
+                y_1,
+                y_2,
+                y_2,
+                y_2,
+                vert_line,
+            )
+
+            fig.write_image(f"Plots/{event_date}_{ticker}_{y_1}.png")
+
+                    
 
 
 # %%
