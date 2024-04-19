@@ -237,7 +237,6 @@ def intraday_plot(
         y_ax2_label = None,
         y_ax2_title = None,
         vertical_line = None,
-        vert_line_label = None,
         mode = 'lines',
         x_ax_title = 'Date',
         ):
@@ -282,12 +281,8 @@ def intraday_plot(
     fig.update_layout(title=fig_title)
 
     # Add vertical line if specified
-    if vertical_line:
-        ## There is a bug which does not allow text to be added if a simple datetime string is passed as an argument. Workaround is possible
-        ## by converting to milliseconds. For some reason it then overshoots by an hour, so correct by substracting an hour.
-        vertical_line = pd.to_datetime(vertical_line)
-        vertical_line = vertical_line.timestamp() * 1000 - 3600000  
-        fig.add_vline(x=vertical_line, line_dash="dash", line_color="green", annotation_text=vert_line_label)
+    if vertical_line: 
+        fig.add_vline(x=vertical_line, line_dash="dash", line_color="green")
 
     return fig
 

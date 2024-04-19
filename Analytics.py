@@ -75,13 +75,13 @@ etf_sel_halfhourly = {
 ## Make time series plot for specific period and variables
 ticker = "HYG"
 df = etf_sel_halfhourly[ticker]
-start_date = "2022-01-25"
-end_date = "2022-01-27"
+start_date = "2022-03-14"
+end_date = "2022-03-14"
 title = ticker
 y_1 = "Volume"
 y_2 = "PRICE"
-vert_line = "2022-01-26 14:00:00"
-vert_line_label = "FOMC Meeting"
+vert_line = "2022-03-14 14:00:00"
+
 
 test_fig = intraday_plot(
     df,
@@ -97,7 +97,6 @@ test_fig = intraday_plot(
     y_2,
     y_2,
     vert_line,
-    vert_line_label
 )
 test_fig.show()
 
