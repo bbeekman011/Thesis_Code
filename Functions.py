@@ -366,6 +366,7 @@ def get_eventday_plots(
                     rf"{path}/{event_date}_{ticker}_{y_1}_{total_days}day.png"
                 )
 
+
 def short_ratio(value1, value2):
     return value1 / value2
 
@@ -385,3 +386,25 @@ def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
         )
 
     return output_df
+
+
+def rolling_avg_trading_days(series, window_size):
+    trading_days = series.index.dayofweek < 5  # Filter only weekdays
+    return series[trading_days].rolling(window=window_size, min_periods=1).mean()
+
+
+def add_rolling_window_average_col(df, ave_col_name, window_size, dt_col):
+
+    
+    df.set_index(dt_col, inplace=True)
+
+    rolling_avg = df.groupby(df.index.time)[ave_col_name].apply(
+        rolling_avg_trading_days, window_size=window_size
+    )
+    rolling_avg = rolling_avg.reset_index(level=0, drop=True)
+
+    df[f"{window_size}day_Avg_{ave_col_name}"] = rolling_avg
+
+    df.reset_index(inplace=True)
+
+    return df

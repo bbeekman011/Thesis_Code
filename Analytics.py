@@ -13,6 +13,8 @@ from Functions import (
     get_eventday_plots,
     short_ratio,
     add_daily_cols,
+    rolling_avg_trading_days,
+    add_rolling_window_average_col
 )
 from datetime import datetime, timedelta
 import numpy as np
@@ -130,6 +132,10 @@ for key in etf_sel_daily.keys():
     etf_sel_daily[key] = add_daily_cols(
         etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
     )
+
+
+
+
 
 # %%
 ## Make time series plot for specific period and variables
@@ -422,7 +428,7 @@ etf_sel_daily[ticker] = (
 )
 
 
-
+## Define regression variables
 x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
 # x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
 y = etf_sel_daily[ticker]["Return_LH"].values
@@ -474,6 +480,12 @@ for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key]["Month_Avg_Short"] = rolling_avg_20
 
     etf_sel_halfhourly[key].reset_index(inplace=True)
+
+
+#%% 
+## TEST FUNCTION
+
+test_df = add_rolling_window_average_col(etf_sel_halfhourly['AGG'], 'Short', 5, 'DT')
 
 # %%
 ## Get deviations from averages
