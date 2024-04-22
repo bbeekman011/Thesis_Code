@@ -453,39 +453,16 @@ def rolling_avg_trading_days(series, window_size):
 ## Get 5, 10 and 20 trading day rolling-windows of short volume
 
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key].set_index("DT", inplace=True)
-
-    rolling_avg_5 = (
-        etf_sel_halfhourly[key]
-        .groupby(etf_sel_halfhourly[key].index.time)["Short"]
-        .apply(rolling_avg_trading_days, window_size=5)
-    )
-    rolling_avg_10 = (
-        etf_sel_halfhourly[key]
-        .groupby(etf_sel_halfhourly[key].index.time)["Short"]
-        .apply(rolling_avg_trading_days, window_size=10)
-    )
-    rolling_avg_20 = (
-        etf_sel_halfhourly[key]
-        .groupby(etf_sel_halfhourly[key].index.time)["Short"]
-        .apply(rolling_avg_trading_days, window_size=20)
-    )
-
-    rolling_avg_5 = rolling_avg_5.reset_index(level=0, drop=True)
-    rolling_avg_10 = rolling_avg_10.reset_index(level=0, drop=True)
-    rolling_avg_20 = rolling_avg_20.reset_index(level=0, drop=True)
-
-    etf_sel_halfhourly[key]["Week_Avg_Short"] = rolling_avg_5
-    etf_sel_halfhourly[key]["Two_Week_Avg_Short"] = rolling_avg_10
-    etf_sel_halfhourly[key]["Month_Avg_Short"] = rolling_avg_20
-
-    etf_sel_halfhourly[key].reset_index(inplace=True)
-
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 5, 'DT')
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 10, 'DT')
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 20, 'DT')
 
 #%% 
 ## TEST FUNCTION
 
 test_df = add_rolling_window_average_col(etf_sel_halfhourly['AGG'], 'Short', 5, 'DT')
+
+
 
 # %%
 ## Get deviations from averages

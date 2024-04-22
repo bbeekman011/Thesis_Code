@@ -393,8 +393,9 @@ def rolling_avg_trading_days(series, window_size):
     return series[trading_days].rolling(window=window_size, min_periods=1).mean()
 
 
-def add_rolling_window_average_col(df, ave_col_name, window_size, dt_col):
+def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
 
+    df = df_in.copy()
     
     df.set_index(dt_col, inplace=True)
 
