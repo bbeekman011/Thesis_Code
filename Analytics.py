@@ -10,7 +10,9 @@ from Functions import (
     fill_missing_intervals,
     intraday_plot,
     add_daily_cols,
-    get_eventday_plots
+    get_eventday_plots,
+    short_ratio,
+    add_daily_cols,
 )
 from datetime import datetime, timedelta
 import numpy as np
@@ -74,6 +76,23 @@ etf_dict = {
     'XLY': 'Consumer Discretionary Select Sector SPDR Fund'
 }
 
+
+## List of column suffixes for the 'daily' dataframe
+suffix_list = [
+    "FH",
+    "10first",
+    "10second",
+    "11first",
+    "11second",
+    "12first",
+    "12second",
+    "13first",
+    "13second",
+    "14first",
+    "14second",
+    "SLH",
+    "LH",
+]
 # %%
 # Get rid of short ratio in 09:30:00 column and of infinite values (temporary fix for infinite values until discussed further)
 
@@ -84,6 +103,7 @@ for key in etf_merged_30min_halfhourly_dict.keys():
     etf_merged_30min_halfhourly_dict[key] = etf_merged_30min_halfhourly_dict[
         key
     ].replace([np.inf, -np.inf], np.nan)
+
 
 
 # %%
@@ -102,6 +122,14 @@ etf_sel_halfhourly = {
     if key in etf_merged_30min_halfhourly_dict
 }
 
+
+
+# %%
+## Add short ratio to the 'daily' dataframes
+for key in etf_sel_daily.keys():
+    etf_sel_daily[key] = add_daily_cols(
+        etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
+    )
 
 # %%
 ## Make time series plot for specific period and variables
@@ -133,11 +161,6 @@ test_fig = intraday_plot(
 test_fig.show()
 
 
-# %%
-name = "test_fig"
-test_fig.write_image(
-    rf"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/{name}.png"
-)
 # %%
 ## Loop through tickers, event dates
 
@@ -363,20 +386,28 @@ ax.set_xticklabels(intervals, rotation=45)
 plt.tight_layout()
 plt.show()
 
-# %%
-## Linear regression to test intraday momentum effect
 
-x = etf_sel_daily["SPY"]["Return_FH"].values.reshape(-1, 1)
-y = etf_sel_daily["SPY"]["Return_LH"].values
+#%%
+## Add new column of average short_ratio
 
-model = LinearRegression().fit(x, y)
+col_list_ave =  [
+    
+    "Volume_FH",
+    "Volume_10first",
+    "Volume_10second",
+    "Volume_11first",
+    "Volume_11second",
+    "Volume_12first",
+    "Volume_12second",
+    "Volume_13first",
+    "Volume_13second",
+    "Volume_14first",
+    "Volume_14second",
+    "Volume_SLH"
+]
 
-r_sq = model.score(x, y)
-intercept = model.intercept_
-coeff = model.coef_
-
-
-print(f"R-squared: {r_sq}, intercept: {intercept}, coeff: {coeff}")
+for key in etf_sel_daily.keys():
+    etf_sel_daily[key]['Volume_FDNLH'] = etf_sel_daily[key][col_list_ave].mean(axis=1)
 
 # %%
 # Code for testing with regressions
@@ -391,8 +422,9 @@ etf_sel_daily[ticker] = (
 )
 
 
-# x = etf_sel_daily[ticker][["Short_Ratio_FH", "Short_Ratio_10first"]].values
-x = etf_sel_daily[ticker]["Short_Ratio_SLH"].values.reshape(-1, 1)
+
+x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
+# x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
 y = etf_sel_daily[ticker]["Return_LH"].values
 
 x = sm.add_constant(x)
@@ -472,53 +504,4 @@ plt.show()
 # %%
 
 
-def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
 
-    output_df = df.copy()
-    for suffix in suffix_list:
-
-        input_col_full_1 = f"{input_col1}_{suffix}"
-        input_col_full_2 = f"{input_col2}_{suffix}"
-
-        new_col_full = f"{new_col}_{suffix}"
-
-        output_df[new_col_full] = func(
-            output_df[input_col_full_1], output_df[input_col_full_2]
-        )
-
-    return output_df
-
-
-# %%
-suffix_list = [
-    "FH",
-    "10first",
-    "10second",
-    "11first",
-    "11second",
-    "12first",
-    "12second",
-    "13first",
-    "13second",
-    "14first",
-    "14second",
-    "SLH",
-    "LH",
-]
-
-
-def short_ratio(value1, value2):
-    return value1 / value2
-
-
-# %%
-## Add short ratio to the 'daily' dataframes
-for key in etf_sel_daily.keys():
-    etf_sel_daily[key] = add_daily_cols(
-        etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
-    )
-# %%
-for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key]["Short_Ratio_fdiff"] = etf_sel_halfhourly[key][
-        "Short_Ratio"
-    ].diff()
