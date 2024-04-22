@@ -14,7 +14,8 @@ from Functions import (
     short_ratio,
     add_daily_cols,
     rolling_avg_trading_days,
-    add_rolling_window_average_col
+    add_rolling_window_average_col,
+    intraday_barplot
 )
 from datetime import datetime, timedelta
 import numpy as np
@@ -45,37 +46,43 @@ with open(
 ) as f:
     etf_merged_30min_halfhourly_dict = pickle.load(f)
 
+# Load event data
+df_events = pd.read_excel(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Relevant_event_data.xlsx"
+)
+
+
 etf_dict = {
-    'AGG': 'iShares Core U.S. Aggregate Bond ETF',
-    'BND': 'Vanguard Total Bond Market ETF',
-    'DIA': 'SPDR Dow Jones Industrial Average ETF Trust',
-    'EEM': 'iShares MSCI Emerging Markets ETF',
-    'EFA': 'iShares MSCI EAFE ETF',
-    'FXI': 'iShares China Large-Cap ETF',
-    'HYG': 'iShares iBoxx $ High Yield Corporate Bond ETF',
-    'IEF': 'iShares 7-10 Year Treasury Bond ETF',
-    'IWM': 'iShares Russell 2000 ETF',
-    'IYR': 'iShares U.S. Real Estate ETF',
-    'LQD': 'iShares iBoxx $ Investment Grade Corporate Bond ETF',
-    'QQQ': 'Invesco QQQ Trust Series I (Nasdaq)',
-    'SHY': 'iShares 1-3 Year Treasury Bond ETF',
-    'SPY': 'SPDR S&P 500 ETF Trust',
-    'TLT': 'iShares 20+ Year Treasury Bond ETF',
-    'USHY': 'iShares Broad USD High Yield Corporate Bond ETF',
-    'VCIT': 'Vanguard Intermediate-Term Corporate Bond ETF',
-    'VCSH': 'Vanguard Short-Term Corporate Bond ETF',
-    'VWO': 'Vanguard FTSE Emerging Markets ETF',
-    'XLB': 'Materials Select Sector SPDR Fund',
-    'XLC': 'Communication Services Select Sector SPDR Fund',
-    'XLE': 'Energy Select Sector SPDR Fund',
-    'XLF': 'Financial Select Sector SPDR Fund',
-    'XLI': 'Industrial Select Sector SPDR Fund',
-    'XLK': 'Technology Select Sector SPDR Fund',
-    'XLP': 'Consumer Staples Select Sector SPDR Fund',
-    'XLRE': 'Real Estate Select Sector SPDR Fund',
-    'XLU': 'Utilities Select Sector SPDR Fund',
-    'XLV': 'Health Care Select Sector SPDR Fund',
-    'XLY': 'Consumer Discretionary Select Sector SPDR Fund'
+    "AGG": "iShares Core U.S. Aggregate Bond ETF",
+    "BND": "Vanguard Total Bond Market ETF",
+    "DIA": "SPDR Dow Jones Industrial Average ETF Trust",
+    "EEM": "iShares MSCI Emerging Markets ETF",
+    "EFA": "iShares MSCI EAFE ETF",
+    "FXI": "iShares China Large-Cap ETF",
+    "HYG": "iShares iBoxx $ High Yield Corporate Bond ETF",
+    "IEF": "iShares 7-10 Year Treasury Bond ETF",
+    "IWM": "iShares Russell 2000 ETF",
+    "IYR": "iShares U.S. Real Estate ETF",
+    "LQD": "iShares iBoxx $ Investment Grade Corporate Bond ETF",
+    "QQQ": "Invesco QQQ Trust Series I (Nasdaq)",
+    "SHY": "iShares 1-3 Year Treasury Bond ETF",
+    "SPY": "SPDR S&P 500 ETF Trust",
+    "TLT": "iShares 20+ Year Treasury Bond ETF",
+    "USHY": "iShares Broad USD High Yield Corporate Bond ETF",
+    "VCIT": "Vanguard Intermediate-Term Corporate Bond ETF",
+    "VCSH": "Vanguard Short-Term Corporate Bond ETF",
+    "VWO": "Vanguard FTSE Emerging Markets ETF",
+    "XLB": "Materials Select Sector SPDR Fund",
+    "XLC": "Communication Services Select Sector SPDR Fund",
+    "XLE": "Energy Select Sector SPDR Fund",
+    "XLF": "Financial Select Sector SPDR Fund",
+    "XLI": "Industrial Select Sector SPDR Fund",
+    "XLK": "Technology Select Sector SPDR Fund",
+    "XLP": "Consumer Staples Select Sector SPDR Fund",
+    "XLRE": "Real Estate Select Sector SPDR Fund",
+    "XLU": "Utilities Select Sector SPDR Fund",
+    "XLV": "Health Care Select Sector SPDR Fund",
+    "XLY": "Consumer Discretionary Select Sector SPDR Fund",
 }
 
 
@@ -107,6 +114,47 @@ for key in etf_merged_30min_halfhourly_dict.keys():
     ].replace([np.inf, -np.inf], np.nan)
 
 
+# %%
+## Get dummy variables for events in the dataframes
+## selected_events = [
+#     'ISM Manufacturing',
+#     'FOMC Rate Decision (Upper Bound)',
+#     'Change in Nonfarm Payrolls',
+#     'CPI YoY',
+#     'GDP Annualized QoQ',
+#     'Industrial Production MoM'
+# ]
+for key in etf_merged_30min_halfhourly_dict.keys():
+    merged_df = pd.merge(
+        etf_merged_30min_halfhourly_dict[key],
+        df_events[["DATE", "Event"]],
+        on="DATE",
+        how="left",
+    )
+    merged_df["ISM"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "ISM Manufacturing" else 0
+    )
+    merged_df["FOMC"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "FOMC Rate Decision (Upper Bound)" else 0
+    )
+    merged_df["NFP"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Change in Nonfarm Payrolls" else 0
+    )
+    merged_df["CPI"] = merged_df["Event"].apply(lambda x: 1 if x == "CPI YoY" else 0)
+    merged_df["GDP"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "GDP Annualized QoQ" else 0
+    )
+    merged_df["IP"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Industrial Production MoM" else 0
+    )
+    merged_df["EVENT"] = (
+        (merged_df[["ISM", "FOMC", "NFP", "CPI", "GDP", "IP"]] == 1)
+        .any(axis=1)
+        .astype(int)
+    )
+
+    merged_df.drop(columns=["Event"], inplace=True)
+    etf_merged_30min_halfhourly_dict[key] = merged_df
 
 # %%
 ## Make selection of ETFs to be investigated for preliminary analysis
@@ -125,7 +173,6 @@ etf_sel_halfhourly = {
 }
 
 
-
 # %%
 ## Add short ratio to the 'daily' dataframes
 for key in etf_sel_daily.keys():
@@ -133,8 +180,21 @@ for key in etf_sel_daily.keys():
         etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
     )
 
+#%%
 
+        
+#%%
+# Get barplots for average intraday short volume for event- and non-event days
+# In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
+ticker = "IEF"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "Volume"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "FOMC"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "EVENT"
+start_date = "2014-01-01"
+end_date = "2022-12-31"
+non_event_def = True # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
+
+intraday_barplot(etf_sel_halfhourly, ticker, metric, start_date, end_date, event, non_event_def)
 
 
 # %%
@@ -165,6 +225,7 @@ test_fig = intraday_plot(
     vert_line,
 )
 test_fig.show()
+
 
 
 # %%
@@ -205,20 +266,32 @@ event_dt_list = [
     "2022-09-13 08:30:00",
     "2022-10-13 08:30:00",
     "2022-11-10 08:30:00",
-    "2022-12-13 08:30:00"
+    "2022-12-13 08:30:00",
 ]
 
 
 col_list = ["Short_Ratio", "Short", "Volume"]
 y_2 = "PRICE"
 
-## Specify parent directory
-parent_dir = r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"
 
-
-#%%
 ## Get plots of the selected etfs for pre-defined day range and for selected variables in col_list
-get_eventday_plots(etf_dict, etf_sel_halfhourly, included_etfs, event_dt_list, col_list, y_2, parent_dir, 3)
+
+## Specify parent directory
+parent_dir = (
+    r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"
+)
+
+## Save a lot of plots
+get_eventday_plots(
+    etf_dict,
+    etf_sel_halfhourly,
+    included_etfs,
+    event_dt_list,
+    col_list,
+    y_2,
+    parent_dir,
+    3,
+)
 
 # %%
 ## Get years and weekdays column in dataframes
@@ -393,11 +466,10 @@ plt.tight_layout()
 plt.show()
 
 
-#%%
+# %%
 ## Add new column of average short_ratio
 
-col_list_ave =  [
-    
+col_list_ave = [
     "Volume_FH",
     "Volume_10first",
     "Volume_10second",
@@ -409,11 +481,11 @@ col_list_ave =  [
     "Volume_13second",
     "Volume_14first",
     "Volume_14second",
-    "Volume_SLH"
+    "Volume_SLH",
 ]
 
 for key in etf_sel_daily.keys():
-    etf_sel_daily[key]['Volume_FDNLH'] = etf_sel_daily[key][col_list_ave].mean(axis=1)
+    etf_sel_daily[key]["Volume_FDNLH"] = etf_sel_daily[key][col_list_ave].mean(axis=1)
 
 # %%
 # Code for testing with regressions
@@ -453,23 +525,22 @@ def rolling_avg_trading_days(series, window_size):
 ## Get 5, 10 and 20 trading day rolling-windows of short volume
 
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 5, 'DT')
-    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 10, 'DT')
-    etf_sel_halfhourly[key] = add_rolling_window_average_col(etf_sel_halfhourly[key], 'Short', 20, 'DT')
-
-#%% 
-## TEST FUNCTION
-
-test_df = add_rolling_window_average_col(etf_sel_halfhourly['AGG'], 'Short', 5, 'DT')
-
-
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(
+        etf_sel_halfhourly[key], "Short", 5, "DT"
+    )
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(
+        etf_sel_halfhourly[key], "Short", 10, "DT"
+    )
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(
+        etf_sel_halfhourly[key], "Short", 20, "DT"
+    )
 
 # %%
 ## Get deviations from averages
 for key in etf_sel_halfhourly.keys():
 
-    etf_sel_halfhourly[key]["Abn_Short_Week"] = (
-        etf_sel_halfhourly[key]["Short"] - etf_sel_halfhourly[key]["Week_Avg_Short"]
+    etf_sel_halfhourly[key]["Abn_Short_5day"] = (
+        etf_sel_halfhourly[key]["Short"] - etf_sel_halfhourly[key]["Week_Avg_5day"]
     )
     etf_sel_halfhourly[key]["Abn_Short_Two_Week"] = (
         etf_sel_halfhourly[key]["Short"] - etf_sel_halfhourly[key]["Two_Week_Avg_Short"]
@@ -487,10 +558,3 @@ plt.title("Density Plot of {}".format(column_name))
 plt.xlabel(column_name)
 plt.ylabel("Density")
 plt.show()
-# %%
-
-
-# %%
-
-
-

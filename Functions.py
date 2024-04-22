@@ -409,3 +409,46 @@ def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
     df.reset_index(inplace=True)
 
     return df
+
+
+def intraday_barplot(dict, ticker, metric, start_date, end_date, event, non_event_def=True):
+    import matplotlib.pyplot as plt
+    
+    df = dict[ticker]
+
+    df = df[(df['DATE'] >= start_date) & (df['DATE'] <= end_date)]
+
+
+    event_df = df[df[event] == 1]
+    
+    if non_event_def is True:
+        non_event_df = df[df["EVENT"] == 0]
+    else:
+        non_event_df = df[df[event] == 0]
+
+    event_grouped = event_df.groupby(event_df['TIME'])[metric].mean().reset_index()
+    non_event_grouped = non_event_df.groupby(non_event_df['TIME'])[metric].mean().reset_index()
+    
+
+
+    # Plotting
+    plt.figure(figsize=(12, 6))
+    bar_width = 0.4
+
+
+    x_event = range(len(event_grouped))
+    x_non_event = [x + bar_width  for x in x_event]
+
+
+    plt.bar(x_event, event_grouped[metric], width=bar_width, label='Event Days', color='blue')
+    plt.bar(x_non_event, non_event_grouped[metric], width=bar_width, label='Non-Event Days', color='orange')
+
+    plt.xlabel('Time')
+    plt.ylabel(metric)
+    plt.title(f'Average Value of {metric} for {ticker} on {event} and non-{event} days ')
+    # Use original x-coordinates for x-axis ticks
+    plt.xticks(x_event, event_grouped['TIME'], rotation=45)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()

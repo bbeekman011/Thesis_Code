@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import time as tm
 import pickle
-
+import pytz
 # %%
 ## Specify paths
 sample_path_etf_prices_30min = r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\ETF_prices_30min.rds"
@@ -31,7 +31,7 @@ etf_vol_30min = pyreadr.read_r(sample_path_etf_vol_30min)
 ### Read Excel and CSV files
 df_us_auctions = pd.read_excel(sample_path_us_auctions)
 df_us_releases = pd.read_excel(sample_path_us_releases)
-df_ty = pd.read_csv(sample_path_ty)
+# df_ty = pd.read_csv(sample_path_ty)
 
 # Convert ordered dictionaries to Pandas dataframe
 # df_etf_prices_1min = etf_prices_1min[None]   ## This file doesn't seem to be correct
@@ -46,7 +46,39 @@ etf_prices_30min_dict = split_df_on_symbol(df_etf_prices_30min, "SYMBOL")
 etf_shvol_30min_dict = split_df_on_symbol(df_etf_shvol_30min, "SYMBOL")
 etf_vol_30min_dict = split_df_on_symbol(df_etf_vol_30min, "SYMBOL")
 
+#%%
+# Get proper timetamps
 
+df_us_releases['Date Time'] = pd.to_datetime(df_us_releases['Date Time'])
+
+#%%
+# Convert from CET to EST
+cet_tz = pytz.timezone('CET')
+est_tz = pytz.timezone('America/New_York')
+
+df_us_releases['Date Time'] = df_us_releases['Date Time'].dt.tz_localize(cet_tz).dt.tz_convert(est_tz)
+df_us_releases['Date Time'] = df_us_releases['Date Time'].dt.tz_localize(None)
+
+#%%
+# Specify names in the Event column of the us releases dataset
+selected_events = [
+    'ISM Manufacturing',
+    'FOMC Rate Decision (Upper Bound)',
+    'Change in Nonfarm Payrolls',
+    'CPI YoY',
+    'GDP Annualized QoQ',
+    'Industrial Production MoM'
+]
+
+#%%
+## Only keep relevant events in the dataframe
+
+df_selected_us_releases = df_us_releases[df_us_releases['Event'].isin(selected_events)].reset_index(drop=True)
+df_selected_us_releases = df_selected_us_releases.rename(columns={"Date":"DATE"})
+
+#%%
+## Save filtered US releases to a file
+df_selected_us_releases.to_excel('Relevant_event_data.xlsx', index=False)
 # %%
 ## Split Datetime into separate date and time
 for key, df in etf_prices_30min_dict.items():
@@ -158,6 +190,7 @@ with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Da
 
 with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl", "wb") as f:
     pickle.dump(etf_merged_30min_daily_dict, f)
+
 
 
 
