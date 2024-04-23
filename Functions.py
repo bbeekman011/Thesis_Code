@@ -398,8 +398,6 @@ def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
     df = df_in.copy()
     
     df.set_index(dt_col, inplace=True)
-    # Reset index to ensure it's unique
-    df.reset_index(drop=True, inplace=True)
     
     rolling_avg = df.groupby(df.index.time)[ave_col_name].apply(
         rolling_avg_trading_days, window_size=window_size
