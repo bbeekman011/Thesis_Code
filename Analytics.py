@@ -257,7 +257,8 @@ for key in etf_sel_daily.keys():
 
 #%%
 ## Get event counts
-abbr_list = ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT"]
+
+abbr_list = ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT", "ISM_lag", "FOMC_lag", "NFP_lag", "CPI_lag", "GDP_lag", "IP_lag", "PI_lag", "HST_lag", "PPI_lag", "EVENT_lag"]
 
 for abbr in abbr_list:
     event_count = etf_sel_halfhourly['AGG'].groupby(etf_sel_halfhourly['AGG']['DATE'])[abbr].max()
@@ -597,10 +598,10 @@ for key in etf_sel_daily.keys():
 # %%
 
 
-# Define the function to calculate rolling window average for trading days, including the day for which it is calculated
-def rolling_avg_trading_days(series, window_size):
-    trading_days = series.index.dayofweek < 5  # Filter only weekdays
-    return series[trading_days].rolling(window=window_size, min_periods=1).mean()
+# # Define the function to calculate rolling window average for trading days, including the day for which it is calculated
+# def rolling_avg_trading_days(series, window_size):
+#     trading_days = series.index.dayofweek < 5  # Filter only weekdays
+#     return series[trading_days].rolling(window=window_size, min_periods=1).mean()
 
 
 ## Get 5, 10 and 20 trading day rolling-windows of short volume
