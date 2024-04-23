@@ -114,16 +114,30 @@ for key in etf_merged_30min_halfhourly_dict.keys():
     ].replace([np.inf, -np.inf], np.nan)
 
 
+#%% 
+## Bit gimmicky way to get 'lagged' dummy variables in a bit
+df_events['DATE'] = pd.to_datetime(df_events['DATE'])
+df_events['DATE_LAG'] = df_events['DATE'] - pd.Timedelta(days=1)
+
+# Back to string
+df_events['DATE'] = df_events['DATE'].dt.strftime('%Y-%m-%d')
+df_events['DATE_LAG'] = df_events['DATE_LAG'].dt.strftime('%Y-%m-%d')
+
 # %%
 ## Get dummy variables for events in the dataframes
-## selected_events = [
+# selected_events = [
 #     'ISM Manufacturing',
 #     'FOMC Rate Decision (Upper Bound)',
 #     'Change in Nonfarm Payrolls',
 #     'CPI YoY',
 #     'GDP Annualized QoQ',
-#     'Industrial Production MoM'
+#     'Industrial Production MoM',
+#     'Personal Income',
+#     'Housing Starts',
+#     'PPI Ex Food and Energy MoM',
 # ]
+
+
 for key in etf_merged_30min_halfhourly_dict.keys():
     merged_df = pd.merge(
         etf_merged_30min_halfhourly_dict[key],
@@ -147,14 +161,75 @@ for key in etf_merged_30min_halfhourly_dict.keys():
     merged_df["IP"] = merged_df["Event"].apply(
         lambda x: 1 if x == "Industrial Production MoM" else 0
     )
+    merged_df["PI"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Personal Income" else 0
+    )
+    merged_df["HST"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Housing Starts" else 0
+    )
+    merged_df["PPI"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "PPI Ex Food and Energy MoM" else 0
+    )
     merged_df["EVENT"] = (
-        (merged_df[["ISM", "FOMC", "NFP", "CPI", "GDP", "IP"]] == 1)
+        (merged_df[["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]] == 1)
         .any(axis=1)
         .astype(int)
     )
 
     merged_df.drop(columns=["Event"], inplace=True)
     etf_merged_30min_halfhourly_dict[key] = merged_df
+
+#%%
+## Change the date column of the event dataframe
+df_events['temp'] = df_events['DATE']
+df_events['DATE'] = df_events['DATE_LAG']
+
+
+## Get lagged dummy variables
+for key in etf_merged_30min_halfhourly_dict.keys():
+    merged_df = pd.merge(
+        etf_merged_30min_halfhourly_dict[key],
+        df_events[["DATE", "Event"]],
+        on="DATE",
+        how="left",
+    )
+    merged_df["ISM_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "ISM Manufacturing" else 0
+    )
+    merged_df["FOMC_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "FOMC Rate Decision (Upper Bound)" else 0
+    )
+    merged_df["NFP_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Change in Nonfarm Payrolls" else 0
+    )
+    merged_df["CPI_lag"] = merged_df["Event"].apply(lambda x: 1 if x == "CPI YoY" else 0)
+    merged_df["GDP_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "GDP Annualized QoQ" else 0
+    )
+    merged_df["IP_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Industrial Production MoM" else 0
+    )
+    merged_df["PI_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Personal Income" else 0
+    )
+    merged_df["HST_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "Housing Starts" else 0
+    )
+    merged_df["PPI_lag"] = merged_df["Event"].apply(
+        lambda x: 1 if x == "PPI Ex Food and Energy MoM" else 0
+    )
+    merged_df["EVENT_lag"] = (
+        (merged_df[["ISM_lag", "FOMC_lag", "NFP_lag", "CPI_lag", "GDP_lag", "IP_lag", "PI_lag", "HST_lag", "PPI_lag"]] == 1)
+        .any(axis=1)
+        .astype(int)
+    )
+
+    merged_df.drop(columns=["Event"], inplace=True)
+    etf_merged_30min_halfhourly_dict[key] = merged_df
+
+#%%
+df_events['DATE'] = df_events['temp']
+df_events = df_events.drop(columns=['DATE_LAG', 'temp'])
 
 # %%
 ## Make selection of ETFs to be investigated for preliminary analysis
@@ -181,15 +256,21 @@ for key in etf_sel_daily.keys():
     )
 
 #%%
+## Get event counts
+abbr_list = ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT"]
 
+for abbr in abbr_list:
+    event_count = etf_sel_halfhourly['AGG'].groupby(etf_sel_halfhourly['AGG']['DATE'])[abbr].max()
+    num_events = (event_count > 0).sum()
+    print(f'{abbr}: {num_events}')
         
 #%%
 # Get barplots for average intraday short volume for event- and non-event days
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
-ticker = "IEF"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "Volume"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "FOMC"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "EVENT"
+ticker = "TLT"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "Short"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "FOMC"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 non_event_def = True # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
@@ -489,29 +570,29 @@ for key in etf_sel_daily.keys():
 
 # %%
 # Code for testing with regressions
-# included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
-ticker = "SHY"
+# # included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
+# ticker = "SHY"
 
-# Remove rows with nan or inf values
+# # Remove rows with nan or inf values
 
-etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
-etf_sel_daily[ticker] = (
-    etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
-)
+# etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
+# etf_sel_daily[ticker] = (
+#     etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
+# )
 
 
-## Define regression variables
-x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
-# x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
-y = etf_sel_daily[ticker]["Return_LH"].values
+# ## Define regression variables
+# x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
+# # x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
+# y = etf_sel_daily[ticker]["Return_LH"].values
 
-x = sm.add_constant(x)
+# x = sm.add_constant(x)
 
-model = sm.OLS(y, x)
+# model = sm.OLS(y, x)
 
-results = model.fit()
+# results = model.fit()
 
-print(results.summary())
+# print(results.summary())
 
 # %%
 

@@ -57,17 +57,21 @@ cet_tz = pytz.timezone('CET')
 est_tz = pytz.timezone('America/New_York')
 
 df_us_releases['Date Time'] = df_us_releases['Date Time'].dt.tz_localize(cet_tz).dt.tz_convert(est_tz)
+#%%
 df_us_releases['Date Time'] = df_us_releases['Date Time'].dt.tz_localize(None)
 
 #%%
-# Specify names in the Event column of the us releases dataset
+# Specify names in the Event column of the us releases dataset, follow Hu et al. (2022), excluding CSI & INC
 selected_events = [
     'ISM Manufacturing',
     'FOMC Rate Decision (Upper Bound)',
     'Change in Nonfarm Payrolls',
     'CPI YoY',
     'GDP Annualized QoQ',
-    'Industrial Production MoM'
+    'Industrial Production MoM',
+    'Personal Income',
+    'Housing Starts',
+    'PPI Ex Food and Energy MoM',
 ]
 
 #%%
