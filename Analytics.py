@@ -291,12 +291,12 @@ for abbr in abbr_list:
 # Get barplots for average intraday short volume for event- and non-event days
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
-ticker = "SHY"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "RETURN"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "FOMC"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+ticker = "TLT"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "Abn_Short_20day"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "PI"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
-non_event_def = False  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
+non_event_def = True  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
 
 intraday_barplot(
     etf_sel_halfhourly, ticker, metric, start_date, end_date, event, non_event_def
@@ -639,6 +639,30 @@ for key in etf_sel_halfhourly.keys():
 
 # %%
 ## Get deviations from averages
+
+def add_abn_col(df_in, var, window_size, new_col_name):
+
+    df = df_in.copy()
+
+    df[f'{new_col_name}_{var}_{window_size}day'] = df[var] - df[f'{var}_Average_{window_size}day']
+
+    return df
+
+#%%
+
+var = 'Short'
+new_col_name = 'Abn'
+
+
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 5, new_col_name)
+    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 10, new_col_name)
+    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 20, new_col_name)
+    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 100, new_col_name)
+
+
+#%%
+
 for key in etf_sel_halfhourly.keys():
 
     etf_sel_halfhourly[key]["Abn_Short_5day"] = (
