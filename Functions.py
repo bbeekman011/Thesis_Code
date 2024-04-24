@@ -389,32 +389,38 @@ def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
 
 
 def rolling_avg_trading_days(series, window_size):
-    trading_days = series.index.dayofweek < 5  # Filter only weekdays
-    return series[trading_days].rolling(window=window_size, min_periods=1).mean()
+    return (
+        series.rolling(window=window_size, min_periods=window_size).mean()
+    )
 
 
 def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
-    def rolling_avg_trading_days(series, window_size):
-        trading_days = series.index.dayofweek < 5  # Filter only weekdays
-        return series[trading_days].rolling(window=window_size, min_periods=1).mean()
     
-
+    def rolling_avg_trading_days(series, window_size):
+        return (
+            series.rolling(window=window_size, min_periods=window_size).mean()
+        )
 
     df = df_in.copy()
-    
     df.set_index(dt_col, inplace=True)
-    
-    rolling_avg = df.groupby(df.index.time)[ave_col_name].apply(
-        rolling_avg_trading_days, window_size=window_size
-    )
-    rolling_avg = rolling_avg.reset_index(level=0, drop=True)
 
+    rolling_grouped = df.groupby(df.index.time)[ave_col_name]
+    rolling_avg = (
+        rolling_grouped.apply(rolling_avg_trading_days, window_size=window_size)
+        .reset_index(level=0, drop=True)
+        .sort_index()
+    )
+
+    rolling_avg = rolling_avg.to_frame()
     df.reset_index(inplace=True)
-    df[f"{window_size}day_Avg_{ave_col_name}"] = rolling_avg
-    df.reset_index(inplace=True)
-    
+    rolling_avg.reset_index(inplace=True)
+
+    merged = pd.merge(df, rolling_avg, on=dt_col, suffixes=('', '_rolling_avg'))
+
+    df = merged
 
     return df
+
 
 
 def intraday_barplot(dict, ticker, metric, start_date, end_date, event, non_event_def=True):
