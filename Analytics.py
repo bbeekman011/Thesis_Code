@@ -124,7 +124,13 @@ df_events = df_events[(df_events['DATE'] >= start_date) & (df_events['DATE']<= e
 
 ## Bit gimmicky way to get 'lagged' dummy variables in a bit
 df_events["DATE"] = pd.to_datetime(df_events["DATE"])
-df_events["DATE_LAG"] = df_events["DATE"] - pd.Timedelta(days=1)
+#%%
+def previous_business_day(date):
+    return date - pd.offsets.BusinessDay()
+#%%
+df_events['DATE_LAG'] = df_events['DATE'].apply(previous_business_day)
+
+# df_events["DATE_LAG"] = df_events["DATE"] - pd.Timedelta(days=1)
 
 # Back to string
 df_events["DATE"] = df_events["DATE"].dt.strftime("%Y-%m-%d")
@@ -134,6 +140,8 @@ df_events.reset_index(drop=True, inplace=True)
 
 
 #%%
+
+## Add dummy variables for the different events to the half-hourly dataframes
 # selected_events = [
 #     'ISM Manufacturing',
 #     'FOMC Rate Decision (Upper Bound)',
@@ -159,7 +167,7 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 
     df1 = etf_merged_30min_halfhourly_dict[key].copy()
 
-    # Create a function to check if an event exists on a given date
+    # Function to check if an event exists on a given date
     def check_event(date, event_list):
         if date in event_map and any(event in event_map[date] for event in event_list):
             return 1
@@ -291,9 +299,9 @@ for abbr in abbr_list:
 # Get barplots for average intraday short volume for event- and non-event days
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
-ticker = "TLT"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "Abn_Short_20day"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "PI"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+ticker = "SHY"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "RETURN"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "PPI"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 non_event_def = True  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
@@ -305,14 +313,14 @@ intraday_barplot(
 
 # %%
 ## Make time series plot for specific period and variables
-ticker = "IEF"
+ticker = "SHY"
 df = etf_sel_halfhourly[ticker]
-start_date = "2022-04-01"
-end_date = "2022-04-05"
+start_date = "2022-05-04"
+end_date = "2022-05-04"
 title = ticker
 y_1 = "Short_Ratio"
 y_2 = "PRICE"
-vert_line = "2022-04-02 14:00:00"
+vert_line = "2022-05-04 14:00:00"
 
 
 test_fig = intraday_plot(
@@ -334,7 +342,6 @@ test_fig.show()
 
 
 # %%
-## Loop through tickers, event dates
 
 # ## Events corresponding to some FOMC meetings, see specifics in the word file
 # event_dt_list = [
@@ -351,51 +358,57 @@ test_fig.show()
 
 
 ## Events correspdoning to some CPI announcements, see specifics in the word file
-event_dt_list = [
-    "2021-05-12 08:30:00",
-    "2021-06-10 08:30:00",
-    "2021-07-13 08:30:00",
-    "2021-08-11 08:30:00",
-    "2021-09-14 08:30:00",
-    "2021-10-13 08:30:00",
-    "2021-11-10 08:30:00",
-    "2021-12-10 08:30:00",
-    "2022-01-12 08:30:00",
-    "2022-02-10 08:30:00",
-    "2022-03-10 08:30:00",
-    "2022-04-12 08:30:00",
-    "2022-05-11 08:30:00",
-    "2022-06-10 08:30:00",
-    "2022-07-13 08:30:00",
-    "2022-08-10 08:30:00",
-    "2022-09-13 08:30:00",
-    "2022-10-13 08:30:00",
-    "2022-11-10 08:30:00",
-    "2022-12-13 08:30:00",
+# event_dt_list = [
+#     "2021-05-12 08:30:00",
+#     "2021-06-10 08:30:00",
+#     "2021-07-13 08:30:00",
+#     "2021-08-11 08:30:00",
+#     "2021-09-14 08:30:00",
+#     "2021-10-13 08:30:00",
+#     "2021-11-10 08:30:00",
+#     "2021-12-10 08:30:00",
+#     "2022-01-12 08:30:00",
+#     "2022-02-10 08:30:00",
+#     "2022-03-10 08:30:00",
+#     "2022-04-12 08:30:00",
+#     "2022-05-11 08:30:00",
+#     "2022-06-10 08:30:00",
+#     "2022-07-13 08:30:00",
+#     "2022-08-10 08:30:00",
+#     "2022-09-13 08:30:00",
+#     "2022-10-13 08:30:00",
+#     "2022-11-10 08:30:00",
+#     "2022-12-13 08:30:00",
+# ]
+
+#%%
+## Code to get many plots, either print and save or display them
+
+
+## Specify parameters for the plotting function
+# List of event dates to be evaluated
+event_dt_list = [               
+    "2020-03-03 14:00:00"   
 ]
 
-
-col_list = ["Short_Ratio", "Short", "Volume"]
-y_2 = "PRICE"
+col_list = ["Volume"] # y1 variables to be included in the plots, if you input multiple variables, a plot will be created for each of them
+y_2 = "PRICE" # y2 variable to be included in the plots, this is just a string input, so it does not support multiple inputs as the y1
+etf_list = ['SPY'] # List of ETFs to be plotted, a plot will be created for each of the ETFs
+day_range = 2   # Range of days around the event date
+display_dummy = True # Dummy, if True the plots will be plotted, if False, the plots will be saved to a specified directory
+parent_dir = (r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI") # Specify parent directory (only necessary if display_dummy = False)
 
 
 ## Get plots of the selected etfs for pre-defined day range and for selected variables in col_list
-
-## Specify parent directory
-parent_dir = (
-    r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"
-)
-
-## Save a lot of plots
 get_eventday_plots(
     etf_dict,
     etf_sel_halfhourly,
-    included_etfs,
+    etf_list,
     event_dt_list,
     col_list,
     y_2,
-    parent_dir,
-    3,
+    day_range,
+    display_dummy,
 )
 
 # %%
@@ -594,30 +607,30 @@ for key in etf_sel_daily.keys():
 
 # %%
 # Code for testing with regressions
-# # included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
-# ticker = "SHY"
+# included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
+ticker = "SHY"
 
-# # Remove rows with nan or inf values
+# Remove rows with nan or inf values
 
-# etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
-# etf_sel_daily[ticker] = (
-#     etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
-# )
-
-
-# ## Define regression variables
-# x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
-# # x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
-# y = etf_sel_daily[ticker]["Return_LH"].values
-
-# x = sm.add_constant(x)
-
-# model = sm.OLS(y, x)
-
-# results = model.fit()
+etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
+etf_sel_daily[ticker] = (
+    etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
+)
 
 
-# print(results.summary())
+## Define regression variables
+x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
+# x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
+y = etf_sel_daily[ticker]["Return_LH"].values
+
+x = sm.add_constant(x)
+
+model = sm.OLS(y, x)
+
+results = model.fit()
+
+
+print(results.summary())
 # %%
 
 ## Get 5, 10 and 20 and 100 trading day rolling-windows of short volume
