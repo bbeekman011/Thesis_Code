@@ -239,6 +239,16 @@ def intraday_plot(
     mode="lines",
     x_ax_title="Date",
 ):
+    """Function to make an intraday interactive plot for a specific date and specific sets of variables
+    Parameters:
+    df: dataframe containing relevant data
+    dt_col: column name of Datetime column
+    date_col: column name of Date column
+    start_date: start date of plot
+    end_date: end date of plot
+    fig_title: title of the figure
+    y_ax1_col: 
+    """
 
     import pandas as pd
     import plotly.graph_objects as go
@@ -320,7 +330,18 @@ def get_eventday_plots(
     display_dummy = True,
     parent_dir = None,
 ):
-    
+    """ This function is used to get a large number of intraday plots, and either save these to a directory or plot them directly.
+    Parameters:
+    name_dict: dictionairy linking ETF tickers to descriptions, used for clarity in plot titles
+    input_dict: dictionairy containing dataframes of data on ETFs, ETF tickers are used as keys
+    ticker_list: list of tickers to be plotted
+    event_dt_list: list of event dates to be plotted
+    y1_list: list of parameters to be plotted on the first y-axis
+    y2: parameter to be plotted on the second y-axis
+    day_range: number of days to plotted around each event date (2-sided, so day_range 2 will plot 5 days)
+    display_dummy: dummy variable indicating if plots should be displayed. If true, plots are displayed, if False, plots are saved
+    parent_dir: only necessary if display_dummy is False. Specifies the parent directory of where the plots should be saved
+    """
 
     total_days = 2 * int(day_range) + 1
 
@@ -409,7 +430,18 @@ def short_ratio(value1, value2):
 
 
 def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
+    """ This function adds columns consisting of an operation on existing columns to the 'daily' dataframe
+    Parameters:
+    df: dataframe to which column is added
+    suffix_list: list of relevant suffixes related to half-hour intervals
+    func: function specifying the operation to be done
+    input_col1: first input column (order is relevant depending on operation to be done)
+    input_col2: second input column (order is relevant depending on operation to be done)
+    new_col: name of the new column (excluding suffixes)
 
+    Returns:
+    output_df: dataframe with new column added for each suffix
+    """
     output_df = df.copy()
     for suffix in suffix_list:
 
@@ -426,11 +458,21 @@ def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
 
 
 def rolling_avg_trading_days(series, window_size):
+
     return series.rolling(window=window_size, min_periods=window_size).mean()
 
 
 def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
+    """This function adds columns containing the rolling average for an x amount of days for a specific time interval, e.g. the 10-day rolling average of the 11:00 interval
+    Parameters:
+    df_in: input dataframe to which columns are added
+    ave_col_name: Name of the column for which the rolling average needs to be added
+    window_size: length of rolling window
+    dt_col: name of the column in df_in containing the datetime variable
 
+    Returns:
+    df: input df with new columns added to it
+    """
     def rolling_avg_trading_days(series, window_size):
         return series.rolling(window=window_size, min_periods=window_size).mean()
 
@@ -461,8 +503,24 @@ def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
 
 
 def intraday_barplot(
-    dict, ticker, metric, start_date, end_date, event, non_event_def=True
+    dict, ticker, metric, start_date, end_date, event, non_event_def=True, lag_bar=False, surprise_split=False, surprise_col = None
 ):
+    """This function is used to make a barplot of the average value of a variable (e.g. Volume, Short volume, Return etc.)
+    for each half hour interval during a trading day (09:30:00 - 16:00:00). Specifically, it is used to compare such values on event days
+    to non-event days, where an event corresponds to a major macroeconomic announcement.
+    Parameters:
+    dict: dictionairy containing dataframes of data with tickers as keys
+    ticker: specific ticker to be plotted, must be a key of the input dataframe
+    start_date: start date of the to be plotted sample
+    end_date: end date of the to be plotted sample
+    event: event to be investigated, choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+    non_event_def: dummy variable determinging definition of 'non-event days'. If True, non-event days are days on which there is no event at all, if False, non-event days are all days except the days on which the specific input event occurs.
+    lag_bar: dummy indicating if a third bar is added showing also the lagged event day
+    surprise_split: dummy indicating if barplot shows different bars for positive and negative surprise
+    surprise_col: suffix of the colname used for the surprise column, used to differentiate between different types of surprise definition
+    Output:
+    Shows barplot
+    """
     import matplotlib.pyplot as plt
 
     df = dict[ticker]
@@ -470,6 +528,8 @@ def intraday_barplot(
     df = df[(df["DATE"] >= start_date) & (df["DATE"] <= end_date)]
 
     event_df = df[df[event] == 1]
+    
+    
 
     if non_event_def is True:
         non_event_df = df[df["EVENT"] == 0]
@@ -481,32 +541,154 @@ def intraday_barplot(
         non_event_df.groupby(non_event_df["TIME"])[metric].mean().reset_index()
     )
 
-    # Plotting
-    plt.figure(figsize=(12, 6))
-    bar_width = 0.4
+    if surprise_split and (event == 'FOMC' or event == "ISM"):
+        event_pos_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == 1)]
+        event_neg_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == -1)]
+        event_neu_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == 0)]
 
-    x_event = range(len(event_grouped))
-    x_non_event = [x + bar_width for x in x_event]
+        n_pos = len(event_pos_df['DATE'].unique())
+        n_neg = len(event_neg_df['DATE'].unique())
+        n_neu = len(event_neu_df['DATE'].unique())
+        
 
-    plt.bar(
-        x_event,
-        event_grouped[metric],
-        width=bar_width,
-        label="Event Days",
-        color="blue",
-    )
-    plt.bar(
-        x_non_event,
-        non_event_grouped[metric],
-        width=bar_width,
-        label="Non-Event Days",
-        color="orange",
-    )
+        event_pos_grouped = event_pos_df.groupby(event_pos_df["TIME"])[metric].mean().reset_index()
+        event_neg_grouped = event_neg_df.groupby(event_neg_df["TIME"])[metric].mean().reset_index()
+        event_neu_grouped = event_neu_df.groupby(event_neu_df["TIME"])[metric].mean().reset_index()
+
+        # Plotting
+        plt.figure(figsize=(12, 6))
+        bar_width = 0.15
+        num_bars = len(event_grouped)
+        counter = -2
+
+
+        # Calculate the x-axis positions for each category
+        
+
+        
+        x_event = [x + counter * bar_width for x in range(num_bars)]
+        counter += 1
+
+        plt.bar(
+            x_event,
+            event_grouped[metric],
+            width=bar_width,
+            label=f"{event} Days",
+            color="blue",
+        )
+        
+        if n_neg > 0:
+            x_neg_event = [x + counter * bar_width for x in range(num_bars)]
+            plt.bar(
+            x_neg_event,
+            event_neg_grouped[metric],
+            width=bar_width,
+            label=f"Negative {event} Days (n={n_neg})",
+            color="red",
+            )
+            counter += 1
+        
+
+        if n_pos > 0:
+            x_pos_event = [x + counter * bar_width for x in range(num_bars)]
+            plt.bar(
+                x_pos_event,
+                event_pos_grouped[metric],
+                width=bar_width,
+                label=f"Positive {event} Days (n={n_pos})",
+                color="green",
+            )
+            counter += 1
+
+        
+
+        if n_neu > 0:
+            x_neu_event = [x + counter * bar_width for x in range(num_bars)]    
+            plt.bar(
+                x_neu_event,
+                event_neu_grouped[metric],
+                width=bar_width,
+                label=f"Neutral {event} Days (n={n_neu})",
+                color="orange",
+            )
+            counter += 1
+        
+        x_non_event = [x + counter * bar_width for x in range(num_bars)] 
+        plt.bar(
+            x_non_event,
+            non_event_grouped[metric],
+            width=bar_width,
+            label=f"Non-{event} Days",
+            color="cyan",
+        )
+
+
+    else:
+
+        if lag_bar:
+
+            event_lag_df = df[df[f'{event}_lag'] == 1]
+            event_lag_grouped = event_lag_df.groupby(event_lag_df["TIME"])[metric].mean().reset_index()
+
+            # Plotting
+            plt.figure(figsize=(12, 6))
+            bar_width = 0.3
+
+            x_event = range(len(event_grouped))
+            x_event_lag = [x - bar_width for x in x_event] 
+            x_non_event = [x + bar_width for x in x_event]
+
+            plt.bar(
+                x_event,
+                event_grouped[metric],
+                width=bar_width,
+                label=f"{event} Days",
+                color="blue",
+            )
+            
+            
+            plt.bar(
+                x_event_lag,
+                event_lag_grouped[metric],
+                width=bar_width,
+                label=f"Lagged {event} Days",
+                color="red",
+            )
+            plt.bar(
+                x_non_event,
+                non_event_grouped[metric],
+                width=bar_width,
+                label=f"Non-{event} Days",
+                color="orange",
+            )
+        else:
+            # Plotting
+            plt.figure(figsize=(12, 6))
+            bar_width = 0.4
+
+            x_event = range(len(event_grouped))
+            x_non_event = [x + bar_width for x in x_event]
+
+            plt.bar(
+                x_event,
+                event_grouped[metric],
+                width=bar_width,
+                label=f"{event} Days",
+                color="blue",
+            )
+
+            plt.bar(
+                x_non_event,
+                non_event_grouped[metric],
+                width=bar_width,
+                label=f"Non-{event} Days",
+                color="orange",
+            )
 
     plt.xlabel("Time")
     plt.ylabel(metric)
     plt.title(
-        f"Average Value of {metric} for {ticker} on {event} and non-{event} days "
+        f"Average Value of {metric} for {ticker} on {event} and non-{event} days in sample period {start_date} - {end_date}"
     )
     # Use original x-coordinates for x-axis ticks
     plt.xticks(x_event, event_grouped["TIME"], rotation=45)

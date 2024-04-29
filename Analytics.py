@@ -85,6 +85,19 @@ etf_dict = {
     "XLY": "Consumer Discretionary Select Sector SPDR Fund",
 }
 
+## Dictionary linking event abbreviations to their relevant description in Bloomberg
+event_dict = {
+    "ISM": "ISM Manufacturing",
+    "FOMC": "FOMC Rate Decision (Upper Bound)",
+    "NFP": "Change in Nonfarm Payrolls",
+    "CPI": "CPI YoY",
+    "GDP": "GDP Annualized QoQ",
+    "IP": "Industrial Production MoM",
+    "PI": "Personal Income",
+    "HST": "Housing Starts",
+    "PPI": "PPI Ex Food and Energy MoM",
+}
+
 
 ## List of column suffixes for the 'daily' dataframe
 suffix_list = [
@@ -117,18 +130,23 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 # %%
 ## Get event_df in correct time range
 ## Get event_df in correct time range
-start_date = '2014-01-01'
-end_date = '2022-12-31'
+start_date = "2014-01-01"
+end_date = "2022-12-31"
 
-df_events = df_events[(df_events['DATE'] >= start_date) & (df_events['DATE']<= end_date)]
+df_events = df_events[
+    (df_events["DATE"] >= start_date) & (df_events["DATE"] <= end_date)
+]
 
 ## Bit gimmicky way to get 'lagged' dummy variables in a bit
 df_events["DATE"] = pd.to_datetime(df_events["DATE"])
-#%%
+
+
+# %%
 def previous_business_day(date):
     return date - pd.offsets.BusinessDay()
-#%%
-df_events['DATE_LAG'] = df_events['DATE'].apply(previous_business_day)
+
+
+df_events["DATE_LAG"] = df_events["DATE"].apply(previous_business_day)
 
 # df_events["DATE_LAG"] = df_events["DATE"] - pd.Timedelta(days=1)
 
@@ -139,7 +157,7 @@ df_events["DATE_LAG"] = df_events["DATE_LAG"].dt.strftime("%Y-%m-%d")
 df_events.reset_index(drop=True, inplace=True)
 
 
-#%%
+# %%
 
 ## Add dummy variables for the different events to the half-hourly dataframes
 # selected_events = [
@@ -155,7 +173,7 @@ df_events.reset_index(drop=True, inplace=True)
 # ]
 for key in etf_merged_30min_halfhourly_dict.keys():
     event_map = {}
-    
+
     # Populate the event map with date-event pairs
     for index, row in df_events.iterrows():
         date = row["DATE"]
@@ -166,6 +184,7 @@ for key in etf_merged_30min_halfhourly_dict.keys():
             event_map[date] = [event]
 
     df1 = etf_merged_30min_halfhourly_dict[key].copy()
+    
 
     # Function to check if an event exists on a given date
     def check_event(date, event_list):
@@ -175,22 +194,76 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 
     # Apply the check_event function to create dummy variables for each event
     df1["ISM"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC"] = df1["DATE"].apply(lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"]))
-    df1["NFP"] = df1["DATE"].apply(lambda x: check_event(x, ["Change in Nonfarm Payrolls"]))
+    df1["FOMC"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
+    )
+    df1["NFP"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
+    )
     df1["CPI"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
     df1["GDP"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP"] = df1["DATE"].apply(lambda x: check_event(x, ["Industrial Production MoM"]))
+    df1["IP"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Industrial Production MoM"])
+    )
     df1["PI"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
     df1["HST"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI"] = df1["DATE"].apply(lambda x: check_event(x, ["PPI Ex Food and Energy MoM"]))
+    df1["PPI"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
+    )
 
     # Create a combined 'EVENT' column
-    df1["EVENT"] = df1[["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]].max(axis=1)
+    df1["EVENT"] = df1[
+        ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]
+    ].max(axis=1)
 
     etf_merged_30min_halfhourly_dict[key] = df1
 
+## Add dummy variables for event days to the daily dataframes
+for key in etf_merged_30min_daily_dict.keys():
+    # Populate the event map with date-event pairs
+    for index, row in df_events.iterrows():
+        date = row["DATE"]
+        event = row["Event"]
+        if date in event_map:
+            event_map[date].append(event)
+        else:
+            event_map[date] = [event]
 
-#%%
+    df1 = etf_merged_30min_daily_dict[key].copy()
+    df1['DATE'] = df1['DATE'].apply(lambda x: x.strftime("%Y-%m-%d"))
+
+    def check_event(date, event_list):
+        if date in event_map and any(event in event_map[date] for event in event_list):
+            return 1
+        return 0
+    
+    # Apply the check_event function to create dummy variables for each event
+    df1["ISM"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
+    df1["FOMC"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
+    )
+    df1["NFP"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
+    )
+    df1["CPI"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
+    df1["GDP"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
+    df1["IP"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Industrial Production MoM"])
+    )
+    df1["PI"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
+    df1["HST"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
+    df1["PPI"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
+    )
+
+    # Create a combined 'EVENT' column
+    df1["EVENT"] = df1[
+        ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]
+    ].max(axis=1)
+
+    df1['DATE'] = pd.to_datetime(df1['DATE'], format='%Y-%m-%d').dt.date
+    etf_merged_30min_daily_dict[key] = df1
+# %%
 ## Add the lagged dummies
 
 ## Change the date column of the event dataframe
@@ -198,10 +271,9 @@ df_events["temp"] = df_events["DATE"]
 df_events["DATE"] = df_events["DATE_LAG"]
 
 
-
 for key in etf_merged_30min_halfhourly_dict.keys():
     event_map = {}
-    
+
     # Populate the event map with date-event pairs
     for index, row in df_events.iterrows():
         date = row["DATE"]
@@ -221,22 +293,157 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 
     # Apply the check_event function to create dummy variables for each event
     df1["ISM_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"]))
-    df1["NFP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Change in Nonfarm Payrolls"]))
+    df1["FOMC_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
+    )
+    df1["NFP_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
+    )
     df1["CPI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
     df1["GDP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Industrial Production MoM"]))
+    df1["IP_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Industrial Production MoM"])
+    )
     df1["PI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
     df1["HST_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["PPI Ex Food and Energy MoM"]))
+    df1["PPI_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
+    )
 
     # Create a combined 'EVENT' column
-    df1["EVENT_lag"] = df1[["ISM_lag", "FOMC_lag", "NFP_lag", "CPI_lag", "GDP_lag", "IP_lag", "PI_lag", "HST_lag", "PPI_lag"]].max(axis=1)
+    df1["EVENT_lag"] = df1[
+        [
+            "ISM_lag",
+            "FOMC_lag",
+            "NFP_lag",
+            "CPI_lag",
+            "GDP_lag",
+            "IP_lag",
+            "PI_lag",
+            "HST_lag",
+            "PPI_lag",
+        ]
+    ].max(axis=1)
 
     etf_merged_30min_halfhourly_dict[key] = df1
 
+## Add lagged dummy variables for event days to the daily dataframes
+for key in etf_merged_30min_daily_dict.keys():
+    # Populate the event map with date-event pairs
+    for index, row in df_events.iterrows():
+        date = row["DATE"]
+        event = row["Event"]
+        if date in event_map:
+            event_map[date].append(event)
+        else:
+            event_map[date] = [event]
+
+    df1 = etf_merged_30min_daily_dict[key].copy()
+    df1['DATE'] = df1['DATE'].apply(lambda x: x.strftime("%Y-%m-%d"))
+
+    def check_event(date, event_list):
+        if date in event_map and any(event in event_map[date] for event in event_list):
+            return 1
+        return 0
+    
+    # Apply the check_event function to create dummy variables for each event
+    df1["ISM_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
+    df1["FOMC_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
+    )
+    df1["NFP_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
+    )
+    df1["CPI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
+    df1["GDP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
+    df1["IP_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["Industrial Production MoM"])
+    )
+    df1["PI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
+    df1["HST_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
+    df1["PPI_lag"] = df1["DATE"].apply(
+        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
+    )
+
+    # Create a combined 'EVENT' column
+    df1["EVENT_lag"] = df1[
+        ["ISM_lag", "FOMC_lag", "NFP_lag", "CPI_lag", "GDP_lag", "IP_lag", "PI_lag", "HST_lag", "PPI_lag"]
+    ].max(axis=1)
+
+    df1['DATE'] = pd.to_datetime(df1['DATE'], format='%Y-%m-%d').dt.date
+    etf_merged_30min_daily_dict[key] = df1
+    
 df_events["DATE"] = df_events["temp"]
 df_events = df_events.drop(columns=["DATE_LAG", "temp"])
+
+#%%
+## Create FOMC and ISM surprise columns based on forecaster surprise, 1: positive surprise, -1: negative surprise, 0: no surprise (median forecaster correct, or no dispersion in forecasts)
+for key in etf_merged_30min_halfhourly_dict.keys():
+    df = etf_merged_30min_halfhourly_dict[key].copy()
+
+    fomc_event_dates = df[df['FOMC'] == 1]['DATE'].unique()
+    ism_event_dates = df[df['ISM'] == 1]['DATE'].unique()
+
+    # Function to get surprise for given date and event
+    
+    def get_surprise(event_df, date, event):
+        try:
+            return event_df[(event_df['DATE'] == date) & (event_df['Event'] == event_dict[event])]['Surprise'].iloc[0]
+        except IndexError:
+            return None
+    
+    # def get_stddev(event_df, date, event):
+    #     try:
+    #         return event_df[(event_df['DATE'] == date) & (event_df['Event'] == event_dict[event])]['Std Dev'].iloc[0]
+    #     except IndexError:
+    #         return None
+    
+    for date in fomc_event_dates:
+        surprise = get_surprise(df_events, date, 'FOMC')
+        
+        if surprise is not None:
+            if surprise > 0:
+                df.loc[df['DATE'] == date, 'FOMC_surprise'] = -1
+            elif surprise < 0:
+                df.loc[df['DATE'] == date, 'FOMC_surprise'] = 1
+            else:
+                df.loc[df['DATE'] == date, 'FOMC_surprise'] = 0
+
+            
+
+    
+    for date in ism_event_dates:
+        surprise = get_surprise(df_events, date, 'ISM')
+        
+        if surprise is not None:
+            if surprise > 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise'] = 1
+            elif surprise < 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise'] = -1
+            else:
+                df.loc[df['DATE'] == date, 'ISM_surprise'] = 0
+            
+            if abs(surprise) < 1:
+                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = 0
+            elif surprise > 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = 1
+            elif surprise < 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = -1
+
+            if abs(surprise) < 2:
+                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = 0
+            elif surprise > 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = 1
+            elif surprise < 0:
+                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = -1
+    
+    etf_merged_30min_halfhourly_dict[key] = df
+
+
+
+
+
+
 
 # %%
 ## Make selection of ETFs to be investigated for preliminary analysis
@@ -299,15 +506,27 @@ for abbr in abbr_list:
 # Get barplots for average intraday short volume for event- and non-event days
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
-ticker = "SHY"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "RETURN"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "PPI"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+ticker = "LQD"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "Short_Ratio"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "ISM"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 non_event_def = True  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
+lag_bar = True
+surprise_split = False
+surprise_col = 'surprise'
 
 intraday_barplot(
-    etf_sel_halfhourly, ticker, metric, start_date, end_date, event, non_event_def
+    etf_sel_halfhourly,
+    ticker,
+    metric,
+    start_date,
+    end_date,
+    event,
+    non_event_def=non_event_def,
+    lag_bar=lag_bar,
+    surprise_split=surprise_split,
+    surprise_col=surprise_col,
 )
 
 
@@ -381,22 +600,24 @@ test_fig.show()
 #     "2022-12-13 08:30:00",
 # ]
 
-#%%
+# %%
 ## Code to get many plots, either print and save or display them
 
 
 ## Specify parameters for the plotting function
 # List of event dates to be evaluated
-event_dt_list = [               
-    "2020-03-03 14:00:00"   
-]
+event_dt_list = ["2020-03-03 14:00:00"]
 
-col_list = ["Volume"] # y1 variables to be included in the plots, if you input multiple variables, a plot will be created for each of them
-y_2 = "PRICE" # y2 variable to be included in the plots, this is just a string input, so it does not support multiple inputs as the y1
-etf_list = ['SPY'] # List of ETFs to be plotted, a plot will be created for each of the ETFs
-day_range = 2   # Range of days around the event date
-display_dummy = True # Dummy, if True the plots will be plotted, if False, the plots will be saved to a specified directory
-parent_dir = (r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI") # Specify parent directory (only necessary if display_dummy = False)
+col_list = [
+    "Volume"
+]  # y1 variables to be included in the plots, if you input multiple variables, a plot will be created for each of them
+y_2 = "PRICE"  # y2 variable to be included in the plots, this is just a string input, so it does not support multiple inputs as the y1
+etf_list = [
+    "SPY"
+]  # List of ETFs to be plotted, a plot will be created for each of the ETFs
+day_range = 2  # Range of days around the event date
+display_dummy = True  # Dummy, if True the plots will be plotted, if False, the plots will be saved to a specified directory
+parent_dir = r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"  # Specify parent directory (only necessary if display_dummy = False)
 
 
 ## Get plots of the selected etfs for pre-defined day range and for selected variables in col_list
@@ -607,9 +828,9 @@ for key in etf_sel_daily.keys():
 
 # %%
 # Code for testing with regressions
-# included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
-ticker = "SHY"
 
+# included_etfs = ['AGG', 'HYG', 'IEF', 'LQD', 'SPY', 'SHY', 'TLT']
+ticker = "TLT"
 # Remove rows with nan or inf values
 
 etf_sel_daily[ticker] = etf_sel_daily[ticker].dropna()
@@ -617,11 +838,15 @@ etf_sel_daily[ticker] = (
     etf_sel_daily[ticker].replace([np.inf, -np.inf], np.nan).dropna()
 )
 
+x = ["ISM"
+    ]
+
 
 ## Define regression variables
-x = etf_sel_daily[ticker][["Short_Ratio_FDNLH", "Short_FDNLH"]].values
-# x = etf_sel_daily[ticker]["Short_FDNLH"].values.reshape(-1, 1)
-y = etf_sel_daily[ticker]["Return_LH"].values
+
+x = etf_sel_daily[ticker][x].values
+# x = etf_sel_daily[ticker]["ISM"].values.reshape(-1, 1)
+y = etf_sel_daily[ticker]["Return_09first"].values
 
 x = sm.add_constant(x)
 
@@ -653,28 +878,38 @@ for key in etf_sel_halfhourly.keys():
 # %%
 ## Get deviations from averages
 
+
 def add_abn_col(df_in, var, window_size, new_col_name):
 
     df = df_in.copy()
 
-    df[f'{new_col_name}_{var}_{window_size}day'] = df[var] - df[f'{var}_Average_{window_size}day']
+    df[f"{new_col_name}_{var}_{window_size}day"] = (
+        df[var] - df[f"{var}_Average_{window_size}day"]
+    )
 
     return df
 
-#%%
 
-var = 'Short'
-new_col_name = 'Abn'
+# %%
+
+var = "Short"
+new_col_name = "Abn"
 
 
 for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 5, new_col_name)
-    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 10, new_col_name)
-    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 20, new_col_name)
-    etf_sel_halfhourly[key] = add_abn_col(etf_sel_halfhourly[key], var, 100, new_col_name)
+    etf_sel_halfhourly[key] = add_abn_col(
+        etf_sel_halfhourly[key], var, 10, new_col_name
+    )
+    etf_sel_halfhourly[key] = add_abn_col(
+        etf_sel_halfhourly[key], var, 20, new_col_name
+    )
+    etf_sel_halfhourly[key] = add_abn_col(
+        etf_sel_halfhourly[key], var, 100, new_col_name
+    )
 
 
-#%%
+# %%
 
 for key in etf_sel_halfhourly.keys():
 
