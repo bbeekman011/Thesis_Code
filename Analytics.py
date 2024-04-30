@@ -16,8 +16,10 @@ from Functions import (
     rolling_avg_trading_days,
     add_rolling_window_average_col,
     intraday_barplot,
+    event_date_transformation,
+    add_event_dummies,
 )
-from datetime import datetime, timedelta
+from datetime import timedelta, datetime, date
 import numpy as np
 import time as tm
 import pickle
@@ -129,34 +131,10 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 
 # %%
 ## Get event_df in correct time range
-## Get event_df in correct time range
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 
-df_events = df_events[
-    (df_events["DATE"] >= start_date) & (df_events["DATE"] <= end_date)
-]
-
-## Bit gimmicky way to get 'lagged' dummy variables in a bit
-df_events["DATE"] = pd.to_datetime(df_events["DATE"])
-
-
-# %%
-def previous_business_day(date):
-    return date - pd.offsets.BusinessDay()
-
-
-df_events["DATE_LAG"] = df_events["DATE"].apply(previous_business_day)
-
-# df_events["DATE_LAG"] = df_events["DATE"] - pd.Timedelta(days=1)
-
-# Back to string
-df_events["DATE"] = df_events["DATE"].dt.strftime("%Y-%m-%d")
-df_events["DATE_LAG"] = df_events["DATE_LAG"].dt.strftime("%Y-%m-%d")
-
-df_events.reset_index(drop=True, inplace=True)
-
-
+df_events = event_date_transformation(df_events, start_date, end_date)
 # %%
 
 ## Add dummy variables for the different events to the half-hourly dataframes
@@ -171,210 +149,14 @@ df_events.reset_index(drop=True, inplace=True)
 #     'Housing Starts',
 #     'PPI Ex Food and Energy MoM',
 # ]
-for key in etf_merged_30min_halfhourly_dict.keys():
-    event_map = {}
 
-    # Populate the event map with date-event pairs
-    for index, row in df_events.iterrows():
-        date = row["DATE"]
-        event = row["Event"]
-        if date in event_map:
-            event_map[date].append(event)
-        else:
-            event_map[date] = [event]
+## Add dummies
+etf_merged_30min_halfhourly_dict = add_event_dummies(etf_merged_30min_halfhourly_dict, df_events, event_dict, 0)
+etf_merged_30min_daily_dict = add_event_dummies(etf_merged_30min_daily_dict, df_events, event_dict, 0)
 
-    df1 = etf_merged_30min_halfhourly_dict[key].copy()
-    
-
-    # Function to check if an event exists on a given date
-    def check_event(date, event_list):
-        if date in event_map and any(event in event_map[date] for event in event_list):
-            return 1
-        return 0
-
-    # Apply the check_event function to create dummy variables for each event
-    df1["ISM"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
-    )
-    df1["NFP"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
-    )
-    df1["CPI"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
-    df1["GDP"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Industrial Production MoM"])
-    )
-    df1["PI"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
-    df1["HST"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
-    )
-
-    # Create a combined 'EVENT' column
-    df1["EVENT"] = df1[
-        ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]
-    ].max(axis=1)
-
-    etf_merged_30min_halfhourly_dict[key] = df1
-
-## Add dummy variables for event days to the daily dataframes
-for key in etf_merged_30min_daily_dict.keys():
-    # Populate the event map with date-event pairs
-    for index, row in df_events.iterrows():
-        date = row["DATE"]
-        event = row["Event"]
-        if date in event_map:
-            event_map[date].append(event)
-        else:
-            event_map[date] = [event]
-
-    df1 = etf_merged_30min_daily_dict[key].copy()
-    df1['DATE'] = df1['DATE'].apply(lambda x: x.strftime("%Y-%m-%d"))
-
-    def check_event(date, event_list):
-        if date in event_map and any(event in event_map[date] for event in event_list):
-            return 1
-        return 0
-    
-    # Apply the check_event function to create dummy variables for each event
-    df1["ISM"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
-    )
-    df1["NFP"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
-    )
-    df1["CPI"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
-    df1["GDP"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Industrial Production MoM"])
-    )
-    df1["PI"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
-    df1["HST"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
-    )
-
-    # Create a combined 'EVENT' column
-    df1["EVENT"] = df1[
-        ["ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI"]
-    ].max(axis=1)
-
-    df1['DATE'] = pd.to_datetime(df1['DATE'], format='%Y-%m-%d').dt.date
-    etf_merged_30min_daily_dict[key] = df1
-# %%
-## Add the lagged dummies
-
-## Change the date column of the event dataframe
-df_events["temp"] = df_events["DATE"]
-df_events["DATE"] = df_events["DATE_LAG"]
-
-
-for key in etf_merged_30min_halfhourly_dict.keys():
-    event_map = {}
-
-    # Populate the event map with date-event pairs
-    for index, row in df_events.iterrows():
-        date = row["DATE"]
-        event = row["Event"]
-        if date in event_map:
-            event_map[date].append(event)
-        else:
-            event_map[date] = [event]
-
-    df1 = etf_merged_30min_halfhourly_dict[key].copy()
-
-    # Create a function to check if an event exists on a given date
-    def check_event(date, event_list):
-        if date in event_map and any(event in event_map[date] for event in event_list):
-            return 1
-        return 0
-
-    # Apply the check_event function to create dummy variables for each event
-    df1["ISM_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
-    )
-    df1["NFP_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
-    )
-    df1["CPI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
-    df1["GDP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Industrial Production MoM"])
-    )
-    df1["PI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
-    df1["HST_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
-    )
-
-    # Create a combined 'EVENT' column
-    df1["EVENT_lag"] = df1[
-        [
-            "ISM_lag",
-            "FOMC_lag",
-            "NFP_lag",
-            "CPI_lag",
-            "GDP_lag",
-            "IP_lag",
-            "PI_lag",
-            "HST_lag",
-            "PPI_lag",
-        ]
-    ].max(axis=1)
-
-    etf_merged_30min_halfhourly_dict[key] = df1
-
-## Add lagged dummy variables for event days to the daily dataframes
-for key in etf_merged_30min_daily_dict.keys():
-    # Populate the event map with date-event pairs
-    for index, row in df_events.iterrows():
-        date = row["DATE"]
-        event = row["Event"]
-        if date in event_map:
-            event_map[date].append(event)
-        else:
-            event_map[date] = [event]
-
-    df1 = etf_merged_30min_daily_dict[key].copy()
-    df1['DATE'] = df1['DATE'].apply(lambda x: x.strftime("%Y-%m-%d"))
-
-    def check_event(date, event_list):
-        if date in event_map and any(event in event_map[date] for event in event_list):
-            return 1
-        return 0
-    
-    # Apply the check_event function to create dummy variables for each event
-    df1["ISM_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["ISM Manufacturing"]))
-    df1["FOMC_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["FOMC Rate Decision (Upper Bound)"])
-    )
-    df1["NFP_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Change in Nonfarm Payrolls"])
-    )
-    df1["CPI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["CPI YoY"]))
-    df1["GDP_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["GDP Annualized QoQ"]))
-    df1["IP_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["Industrial Production MoM"])
-    )
-    df1["PI_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Personal Income"]))
-    df1["HST_lag"] = df1["DATE"].apply(lambda x: check_event(x, ["Housing Starts"]))
-    df1["PPI_lag"] = df1["DATE"].apply(
-        lambda x: check_event(x, ["PPI Ex Food and Energy MoM"])
-    )
-
-    # Create a combined 'EVENT' column
-    df1["EVENT_lag"] = df1[
-        ["ISM_lag", "FOMC_lag", "NFP_lag", "CPI_lag", "GDP_lag", "IP_lag", "PI_lag", "HST_lag", "PPI_lag"]
-    ].max(axis=1)
-
-    df1['DATE'] = pd.to_datetime(df1['DATE'], format='%Y-%m-%d').dt.date
-    etf_merged_30min_daily_dict[key] = df1
-    
-df_events["DATE"] = df_events["temp"]
-df_events = df_events.drop(columns=["DATE_LAG", "temp"])
+## Add lagged dummies
+etf_merged_30min_halfhourly_dict = add_event_dummies(etf_merged_30min_halfhourly_dict, df_events, event_dict, 1)
+etf_merged_30min_daily_dict = add_event_dummies(etf_merged_30min_daily_dict, df_events, event_dict, 1)
 
 #%%
 ## Create FOMC and ISM surprise columns based on forecaster surprise, 1: positive surprise, -1: negative surprise, 0: no surprise (median forecaster correct, or no dispersion in forecasts)

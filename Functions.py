@@ -1,5 +1,5 @@
 ## This file contains all the functions used in the thesis project of Bas Beekman
-from datetime import datetime
+from datetime import datetime, date
 import pandas as pd
 
 
@@ -247,7 +247,7 @@ def intraday_plot(
     start_date: start date of plot
     end_date: end date of plot
     fig_title: title of the figure
-    y_ax1_col: 
+    y_ax1_col:
     """
 
     import pandas as pd
@@ -327,10 +327,10 @@ def get_eventday_plots(
     y1_list,
     y_2: str,
     day_range: int,
-    display_dummy = True,
-    parent_dir = None,
+    display_dummy=True,
+    parent_dir=None,
 ):
-    """ This function is used to get a large number of intraday plots, and either save these to a directory or plot them directly.
+    """This function is used to get a large number of intraday plots, and either save these to a directory or plot them directly.
     Parameters:
     name_dict: dictionairy linking ETF tickers to descriptions, used for clarity in plot titles
     input_dict: dictionairy containing dataframes of data on ETFs, ETF tickers are used as keys
@@ -347,12 +347,12 @@ def get_eventday_plots(
 
     for event_dt in event_dt_list:
 
-        
         event_date = pd.to_datetime(event_dt).strftime("%Y-%m-%d")
 
         if display_dummy is False:
             # Create new directory for files to be stored in
-            import os    
+            import os
+
             parent_dir = parent_dir
             new_dir = event_date
             path = os.path.join(parent_dir, new_dir)
@@ -392,7 +392,7 @@ def get_eventday_plots(
                         rf"{path}/{event_date}_{ticker}_{y_1}_{total_days}day.png"
                     )
         else:
-             for ticker in ticker_list:
+            for ticker in ticker_list:
 
                 df = input_dict[ticker]
                 vert_line = event_dt
@@ -424,13 +424,12 @@ def get_eventday_plots(
                     fig.show()
 
 
-
 def short_ratio(value1, value2):
     return value1 / value2
 
 
 def add_daily_cols(df, suffix_list, func, input_col1, input_col2, new_col):
-    """ This function adds columns consisting of an operation on existing columns to the 'daily' dataframe
+    """This function adds columns consisting of an operation on existing columns to the 'daily' dataframe
     Parameters:
     df: dataframe to which column is added
     suffix_list: list of relevant suffixes related to half-hour intervals
@@ -473,6 +472,7 @@ def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
     Returns:
     df: input df with new columns added to it
     """
+
     def rolling_avg_trading_days(series, window_size):
         return series.rolling(window=window_size, min_periods=window_size).mean()
 
@@ -503,7 +503,16 @@ def add_rolling_window_average_col(df_in, ave_col_name, window_size, dt_col):
 
 
 def intraday_barplot(
-    dict, ticker, metric, start_date, end_date, event, non_event_def=True, lag_bar=False, surprise_split=False, surprise_col = None
+    dict,
+    ticker,
+    metric,
+    start_date,
+    end_date,
+    event,
+    non_event_def=True,
+    lag_bar=False,
+    surprise_split=False,
+    surprise_col=None,
 ):
     """This function is used to make a barplot of the average value of a variable (e.g. Volume, Short volume, Return etc.)
     for each half hour interval during a trading day (09:30:00 - 16:00:00). Specifically, it is used to compare such values on event days
@@ -528,8 +537,6 @@ def intraday_barplot(
     df = df[(df["DATE"] >= start_date) & (df["DATE"] <= end_date)]
 
     event_df = df[df[event] == 1]
-    
-    
 
     if non_event_def is True:
         non_event_df = df[df["EVENT"] == 0]
@@ -541,19 +548,24 @@ def intraday_barplot(
         non_event_df.groupby(non_event_df["TIME"])[metric].mean().reset_index()
     )
 
-    if surprise_split and (event == 'FOMC' or event == "ISM"):
-        event_pos_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == 1)]
-        event_neg_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == -1)]
-        event_neu_df = df[(df[event] == 1) & (df[f'{event}_{surprise_col}'] == 0)]
+    if surprise_split and (event == "FOMC" or event == "ISM"):
+        event_pos_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == 1)]
+        event_neg_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == -1)]
+        event_neu_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == 0)]
 
-        n_pos = len(event_pos_df['DATE'].unique())
-        n_neg = len(event_neg_df['DATE'].unique())
-        n_neu = len(event_neu_df['DATE'].unique())
-        
+        n_pos = len(event_pos_df["DATE"].unique())
+        n_neg = len(event_neg_df["DATE"].unique())
+        n_neu = len(event_neu_df["DATE"].unique())
 
-        event_pos_grouped = event_pos_df.groupby(event_pos_df["TIME"])[metric].mean().reset_index()
-        event_neg_grouped = event_neg_df.groupby(event_neg_df["TIME"])[metric].mean().reset_index()
-        event_neu_grouped = event_neu_df.groupby(event_neu_df["TIME"])[metric].mean().reset_index()
+        event_pos_grouped = (
+            event_pos_df.groupby(event_pos_df["TIME"])[metric].mean().reset_index()
+        )
+        event_neg_grouped = (
+            event_neg_df.groupby(event_neg_df["TIME"])[metric].mean().reset_index()
+        )
+        event_neu_grouped = (
+            event_neu_df.groupby(event_neu_df["TIME"])[metric].mean().reset_index()
+        )
 
         # Plotting
         plt.figure(figsize=(12, 6))
@@ -561,11 +573,8 @@ def intraday_barplot(
         num_bars = len(event_grouped)
         counter = -2
 
-
         # Calculate the x-axis positions for each category
-        
 
-        
         x_event = [x + counter * bar_width for x in range(num_bars)]
         counter += 1
 
@@ -576,18 +585,17 @@ def intraday_barplot(
             label=f"{event} Days",
             color="blue",
         )
-        
+
         if n_neg > 0:
             x_neg_event = [x + counter * bar_width for x in range(num_bars)]
             plt.bar(
-            x_neg_event,
-            event_neg_grouped[metric],
-            width=bar_width,
-            label=f"Negative {event} Days (n={n_neg})",
-            color="red",
+                x_neg_event,
+                event_neg_grouped[metric],
+                width=bar_width,
+                label=f"Negative {event} Days (n={n_neg})",
+                color="red",
             )
             counter += 1
-        
 
         if n_pos > 0:
             x_pos_event = [x + counter * bar_width for x in range(num_bars)]
@@ -600,10 +608,8 @@ def intraday_barplot(
             )
             counter += 1
 
-        
-
         if n_neu > 0:
-            x_neu_event = [x + counter * bar_width for x in range(num_bars)]    
+            x_neu_event = [x + counter * bar_width for x in range(num_bars)]
             plt.bar(
                 x_neu_event,
                 event_neu_grouped[metric],
@@ -612,8 +618,8 @@ def intraday_barplot(
                 color="orange",
             )
             counter += 1
-        
-        x_non_event = [x + counter * bar_width for x in range(num_bars)] 
+
+        x_non_event = [x + counter * bar_width for x in range(num_bars)]
         plt.bar(
             x_non_event,
             non_event_grouped[metric],
@@ -622,20 +628,21 @@ def intraday_barplot(
             color="cyan",
         )
 
-
     else:
 
         if lag_bar:
 
-            event_lag_df = df[df[f'{event}_lag'] == 1]
-            event_lag_grouped = event_lag_df.groupby(event_lag_df["TIME"])[metric].mean().reset_index()
+            event_lag_df = df[df[f"{event}_lag"] == 1]
+            event_lag_grouped = (
+                event_lag_df.groupby(event_lag_df["TIME"])[metric].mean().reset_index()
+            )
 
             # Plotting
             plt.figure(figsize=(12, 6))
             bar_width = 0.3
 
             x_event = range(len(event_grouped))
-            x_event_lag = [x - bar_width for x in x_event] 
+            x_event_lag = [x - bar_width for x in x_event]
             x_non_event = [x + bar_width for x in x_event]
 
             plt.bar(
@@ -645,8 +652,7 @@ def intraday_barplot(
                 label=f"{event} Days",
                 color="blue",
             )
-            
-            
+
             plt.bar(
                 x_event_lag,
                 event_lag_grouped[metric],
@@ -696,3 +702,113 @@ def intraday_barplot(
 
     plt.tight_layout()
     plt.show()
+
+
+def event_date_transformation(df, start_date: str, end_date: str):
+    """Function to get dataframe in right sample period
+    Parameters:
+    df: dataframe to be transformed, should have a "DATE" column containing dates
+    start_date (string): start of sample date in (YYYY-MM-DD) format
+    end_date (string): end of sample date in (YYYY-MM-DD) format
+    Returns:
+    df: original df in correct sample period
+    """
+
+    df = df[(df["DATE"] >= start_date) & (df["DATE"] <= end_date)]
+
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
+
+def add_event_dummies(dict_in, df_event, event_dict, lag: int):
+    """This function adds (lagged) dummy variables for specific events to each dataframe in a dictionary of dataframes.
+    Paremters:
+    dict_in: input dictionary containing dataframes with data to which event dummies should be added
+    df_event: dataframe containing data on different events (here obtained from Bloomberg)
+    event_dict: dictionary linking abbrevations for different events to their description as given in the "Event" column in the Bloomberg data
+    lag (int): parameter specifying the number of lags of the dummy, input 0 if you want a dummy for the event date itself
+    Returns:
+    dict_in: dictionary of dataframes, where to each dataframe the event dummy variables are added
+    """
+    from datetime import datetime, date
+
+    ## Lag the DATE column to match the pre-specified number of lags, makes it easier later to write general code for adding the dummies
+    event_df = df_event.copy()
+    event_df["DATE"] = pd.to_datetime(event_df["DATE"])
+
+    def previous_business_day(date, lag):
+        return date - pd.offsets.BusinessDay(lag)
+
+    event_df["DATE"] = event_df["DATE"].apply(previous_business_day, lag=lag)
+    event_df["DATE"] = event_df["DATE"].dt.strftime("%Y-%m-%d")
+    event_df.reset_index(drop=True, inplace=True)
+
+    
+    # Loop over the dataframes in the dictionary to add event dummy variables
+    for key in dict_in.keys():
+        df1 = dict_in[key].copy()
+
+        event_map = {}
+
+        # Populate the event map with date-event pairs
+        for index, row in event_df.iterrows():
+            dates = row["DATE"]
+            event = row["Event"]
+            if dates in event_map:
+                event_map[dates].append(event)
+            else:
+                event_map[dates] = [event]
+
+        event_map_keys = list(event_map.keys())
+
+        # Function to check if an event exists on a given date
+        def check_event(date, event_list):
+            if date in event_map and any(event in event_map[date] for event in event_list):
+                return 1
+            return 0
+        
+        # Variable to remember if date column transformation was applied
+        date_trans = False
+
+        # Check if DATE column is in correct format
+        if isinstance(df1["DATE"][0], date):
+            df1["DATE"] = df1["DATE"].apply(lambda x: x.strftime("%Y-%m-%d"))
+            date_trans = True
+
+        if lag == 0:
+            # Loop through the dictionary with events and descriptions as in Bloomberg data
+            for key2 in event_dict.keys():
+                # Apply the check_event function to create dummy variables for each event
+                df1[key2] = df1["DATE"].apply(
+                    lambda x: check_event(x, [event_dict[key2]])
+                )
+
+            # Create a combined 'EVENT' column
+            df1["EVENT"] = df1[list(event_dict.keys())].max(axis=1)
+
+            
+
+        else:
+            # Loop through the dictionary with events and descriptions as in Bloomberg data
+            for key2 in event_dict.keys():
+                # Apply the check_event function to create dummy variables for each event
+                df1[f"{key2}_lag{lag}"] = df1["DATE"].apply(
+                    lambda x: check_event(x, [event_dict[key2]])
+                )
+
+            # Create a list of col names
+            lag_col_list = []
+            for key2 in event_dict.keys():
+                lag_col_list.append(f"{key2}_lag{lag}")
+
+            # Create combined 'EVENT' column
+            df1[f"EVENT_lag{lag}"] = df1[lag_col_list].max(axis=1)
+
+        # Change back the DATE column to its original format if necessary
+        if date_trans:
+            df1["DATE"] = pd.to_datetime(df1["DATE"], format="%Y-%m-%d").dt.date
+
+        dict_in[key] = df1
+
+    return dict_in
