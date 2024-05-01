@@ -18,6 +18,8 @@ from Functions import (
     intraday_barplot,
     event_date_transformation,
     add_event_dummies,
+    add_surprise_dummies,
+
 )
 from datetime import timedelta, datetime, date
 import numpy as np
@@ -117,6 +119,36 @@ suffix_list = [
     "SLH",
     "LH",
 ]
+
+interval_mapping_dict = {
+    "09:30:00":"09first",
+    "10:00:00":"FH",
+    "10:30:00":"10first",
+    "11:00:00":"10second",
+    "11:30:00":"11first",
+    "12:00:00":"11second",
+    "12:30:00":"12first",
+    "13:00:00":"12second",
+    "13:30:00":"13first",
+    "14:00:00":"13second",
+    "14:30:00":"14first",
+    "15:00:00":"14second",
+    "15:30:00":"SLH",
+    "16:00:00":"LH",
+}
+
+event_after_release_dict = {
+    "ISM": "10:30:00",
+    "FOMC": "14:30:00",
+    "NFP": "09:30:00",
+    "CPI": "09:30:00",
+    "GDP": "09:30:00",
+    "IP": "09:30:00",
+    "PI": "09:30:00",
+    "HST": "09:30:00",
+    "PPI": "09:30:00",
+}
+
 # %%
 # Get rid of short ratio in 09:30:00 column and of infinite values (temporary fix for infinite values until discussed further)
 
@@ -128,104 +160,11 @@ for key in etf_merged_30min_halfhourly_dict.keys():
         key
     ].replace([np.inf, -np.inf], np.nan)
 
-
-# %%
 ## Get event_df in correct time range
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 
 df_events = event_date_transformation(df_events, start_date, end_date)
-# %%
-
-## Add dummy variables for the different events to the half-hourly dataframes
-# selected_events = [
-#     'ISM Manufacturing',
-#     'FOMC Rate Decision (Upper Bound)',
-#     'Change in Nonfarm Payrolls',
-#     'CPI YoY',
-#     'GDP Annualized QoQ',
-#     'Industrial Production MoM',
-#     'Personal Income',
-#     'Housing Starts',
-#     'PPI Ex Food and Energy MoM',
-# ]
-
-## Add dummies
-etf_merged_30min_halfhourly_dict = add_event_dummies(etf_merged_30min_halfhourly_dict, df_events, event_dict, 0)
-etf_merged_30min_daily_dict = add_event_dummies(etf_merged_30min_daily_dict, df_events, event_dict, 0)
-
-## Add lagged dummies
-etf_merged_30min_halfhourly_dict = add_event_dummies(etf_merged_30min_halfhourly_dict, df_events, event_dict, 1)
-etf_merged_30min_daily_dict = add_event_dummies(etf_merged_30min_daily_dict, df_events, event_dict, 1)
-
-#%%
-## Create FOMC and ISM surprise columns based on forecaster surprise, 1: positive surprise, -1: negative surprise, 0: no surprise (median forecaster correct, or no dispersion in forecasts)
-for key in etf_merged_30min_halfhourly_dict.keys():
-    df = etf_merged_30min_halfhourly_dict[key].copy()
-
-    fomc_event_dates = df[df['FOMC'] == 1]['DATE'].unique()
-    ism_event_dates = df[df['ISM'] == 1]['DATE'].unique()
-
-    # Function to get surprise for given date and event
-    
-    def get_surprise(event_df, date, event):
-        try:
-            return event_df[(event_df['DATE'] == date) & (event_df['Event'] == event_dict[event])]['Surprise'].iloc[0]
-        except IndexError:
-            return None
-    
-    # def get_stddev(event_df, date, event):
-    #     try:
-    #         return event_df[(event_df['DATE'] == date) & (event_df['Event'] == event_dict[event])]['Std Dev'].iloc[0]
-    #     except IndexError:
-    #         return None
-    
-    for date in fomc_event_dates:
-        surprise = get_surprise(df_events, date, 'FOMC')
-        
-        if surprise is not None:
-            if surprise > 0:
-                df.loc[df['DATE'] == date, 'FOMC_surprise'] = -1
-            elif surprise < 0:
-                df.loc[df['DATE'] == date, 'FOMC_surprise'] = 1
-            else:
-                df.loc[df['DATE'] == date, 'FOMC_surprise'] = 0
-
-            
-
-    
-    for date in ism_event_dates:
-        surprise = get_surprise(df_events, date, 'ISM')
-        
-        if surprise is not None:
-            if surprise > 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise'] = 1
-            elif surprise < 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise'] = -1
-            else:
-                df.loc[df['DATE'] == date, 'ISM_surprise'] = 0
-            
-            if abs(surprise) < 1:
-                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = 0
-            elif surprise > 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = 1
-            elif surprise < 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise_1stdev'] = -1
-
-            if abs(surprise) < 2:
-                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = 0
-            elif surprise > 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = 1
-            elif surprise < 0:
-                df.loc[df['DATE'] == date, 'ISM_surprise_2stdev'] = -1
-    
-    etf_merged_30min_halfhourly_dict[key] = df
-
-
-
-
-
-
 
 # %%
 ## Make selection of ETFs to be investigated for preliminary analysis
@@ -242,6 +181,38 @@ etf_sel_halfhourly = {
     for key in included_etfs
     if key in etf_merged_30min_halfhourly_dict
 }
+#%%
+## Add dummy variables for different events, see events specified in event_dict
+etf_sel_halfhourly = add_event_dummies(etf_sel_halfhourly, df_events, event_dict, 0)
+etf_sel_daily = add_event_dummies(etf_sel_daily, df_events, event_dict, 0)
+
+## Add lagged dummies
+etf_sel_halfhourly = add_event_dummies(etf_sel_halfhourly, df_events, event_dict, 1)
+etf_sel_daily = add_event_dummies(etf_sel_daily, df_events, event_dict, 1)
+
+#%%
+# Add surprise dummies to half-hourly dict
+# Specify events for which surprise dummies are added
+event_list = ['FOMC', 'ISM', 'NFP', 'GDP']
+
+
+etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, 'absolute')
+etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, 'absolute')
+
+etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '1_stdev')
+etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, '1_stdev')
+
+etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '2_stdev')
+etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, '2_stdev')
+
+etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, 'marketfh')
+# etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '0.005_marketfh')
+
+etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, 'marketfh')
+# etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, '0.005_marketfh')
+
+etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, 'marketrod')
+etf_sel_daily = add_surprise_dummies(etf_sel_daily, event_dict, df_events, event_list, 'marketrod')
 
 
 # %%
@@ -265,16 +236,16 @@ abbr_list = [
     "HST",
     "PPI",
     "EVENT",
-    "ISM_lag",
-    "FOMC_lag",
-    "NFP_lag",
-    "CPI_lag",
-    "GDP_lag",
-    "IP_lag",
-    "PI_lag",
-    "HST_lag",
-    "PPI_lag",
-    "EVENT_lag",
+    "ISM_lag1",
+    "FOMC_lag1",
+    "NFP_lag1",
+    "CPI_lag1",
+    "GDP_lag1",
+    "IP_lag1",
+    "PI_lag1",
+    "HST_lag1",
+    "PPI_lag1",
+    "EVENT_lag1",
 ]
 
 for abbr in abbr_list:
@@ -288,16 +259,17 @@ for abbr in abbr_list:
 # Get barplots for average intraday short volume for event- and non-event days
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
-ticker = "LQD"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "Short_Ratio"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "ISM"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+ticker = "IEF"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
+metric = "Short_Ratio" # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "GDP"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 non_event_def = True  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
-lag_bar = True
-surprise_split = False
-surprise_col = 'surprise'
-
+lag_bar = False # Set to True if you want to show a bar with the lagged metric, does not work in combination with surprise_split
+lag_num = 1 # Specify number of lags, make sure that the columns with these lags are actually added to the dataframes.
+surprise_split = True # Set to True if the plot should show the negative and positive surprises separately, surprise type is defined in surprise_col
+surprise_col = 'surprise_marketfh' # Choose from options which are added above, e.g. 'absolute', '1_stdev' etc. for measures based on
+                                    # The analyst surprise, and 'marketfh', '0.001_marketfh', 'marketrod' etc. for market based surprise measure
 intraday_barplot(
     etf_sel_halfhourly,
     ticker,
@@ -307,6 +279,7 @@ intraday_barplot(
     event,
     non_event_def=non_event_def,
     lag_bar=lag_bar,
+    lag_num=lag_num,
     surprise_split=surprise_split,
     surprise_col=surprise_col,
 )

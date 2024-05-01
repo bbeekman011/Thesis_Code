@@ -511,6 +511,7 @@ def intraday_barplot(
     event,
     non_event_def=True,
     lag_bar=False,
+    lag_num = None,
     surprise_split=False,
     surprise_col=None,
 ):
@@ -548,7 +549,7 @@ def intraday_barplot(
         non_event_df.groupby(non_event_df["TIME"])[metric].mean().reset_index()
     )
 
-    if surprise_split and (event == "FOMC" or event == "ISM"):
+    if surprise_split:
         event_pos_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == 1)]
         event_neg_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == -1)]
         event_neu_df = df[(df[event] == 1) & (df[f"{event}_{surprise_col}"] == 0)]
@@ -632,7 +633,7 @@ def intraday_barplot(
 
         if lag_bar:
 
-            event_lag_df = df[df[f"{event}_lag"] == 1]
+            event_lag_df = df[df[f"{event}_lag{lag_num}"] == 1]
             event_lag_grouped = (
                 event_lag_df.groupby(event_lag_df["TIME"])[metric].mean().reset_index()
             )
@@ -760,8 +761,7 @@ def add_event_dummies(dict_in, df_event, event_dict, lag: int):
             else:
                 event_map[dates] = [event]
 
-        event_map_keys = list(event_map.keys())
-
+        
         # Function to check if an event exists on a given date
         def check_event(date, event_list):
             if date in event_map and any(event in event_map[date] for event in event_list):
@@ -810,5 +810,247 @@ def add_event_dummies(dict_in, df_event, event_dict, lag: int):
             df1["DATE"] = pd.to_datetime(df1["DATE"], format="%Y-%m-%d").dt.date
 
         dict_in[key] = df1
+
+    return dict_in
+
+def add_surprise_dummies(dict_in, event_dict, event_df, event_list, surprise_def: str):
+    """This function adds a dummy variable indicating if a certain event is a positive, negative or neutral surprise
+    based on either the surprise compared to analyst forecasts or the market reaction.
+    Parameters:
+    dict_in: input dictionary containing dataframes with data to which surprise dummies should be added
+    event_dict: dictionary linking abbrevations for different events to their description as given in the "Event" column in the Bloomberg data
+    df_event: dataframe containing data on different events (here obtained from Bloomberg) 
+    event_list: list of events for which surprise dummies should be added
+    surprise_def (str): string indicating which definition of a surprise should be considered, should be from the following options:
+        absolute: surprise is seen as the sign of the surprise variable
+        (int)_stdev: positive (negative) surprise is defined as surprise larger (smaller) than (-)(int), depending on the type of macroeconomic variable
+        marketfh: positive (negative) surprise is defined as a positive (negative) market reaction to a macroeconomic announcement in the half hour after the announcement
+        (float)_marketfh: positive (negative) surprise is defined as a positive (negative) market reaction to a macroeconomic announcement of at least abs((float)) in the half hour after the announcement
+        marketrod: positive (negative) surprise is defined as a positive (negative) market reaction to a macroeconomic announcement in the cumulative rest-of-day return after the announcement
+        (float)_marketrod: positive (negative) surprise is defined as a positive (negative) market reaction to a macroeconomic announcement of at least abs((float)) in the cumulative rest-of-day return after the announcement
+    """
+
+    import re
+    from datetime import datetime, date
+
+    df_events = event_df.copy()
+    ## Lists of events for which a positive surprise is seen as positive or negative respectively
+    positive_event_list = ['ISM', 'NFP', 'GDP', 'IP', 'PI', 'HST']
+    negative_event_list = ['FOMC', 'CPI', 'PPI']
+    ## Create FOMC and ISM surprise columns based on forecaster surprise, 1: positive surprise, -1: negative surprise, 0: no surprise (median forecaster correct, or no dispersion in forecasts)
+    for key in dict_in.keys():
+        df = dict_in[key].copy()
+
+        # Variable to remember if date column transformation was applied
+        date_trans = False
+
+        # Check if DATE column is in correct format
+        if isinstance(df["DATE"][0], date):
+            df["DATE"] = df["DATE"].apply(lambda x: x.strftime("%Y-%m-%d"))
+            date_trans = True
+
+        event_date_dict = {}
+        for event in event_list:
+            event_date_dict[event] = df[df[event] == 1]['DATE'].unique()
+
+        # fomc_event_dates = df[df['FOMC'] == 1]['DATE'].unique()
+        # ism_event_dates = df[df['ISM'] == 1]['DATE'].unique()
+
+        # Function to get surprise for given date and event
+        
+        def get_surprise(event_df, date, event):
+            try:
+                return event_df[(event_df['DATE'] == date) & (event_df['Event'] == event_dict[event])]['Surprise'].iloc[0]
+            except IndexError:
+                return None
+        
+        # Function to extract number from input string (thx ChatGPT)
+        def extract_number_and_string(input_string):
+            # Regular expression pattern to match either an integer or a float
+            pattern = r'([-+]?\d*\.\d+|\d+)_([^_]*)'
+
+            # Search for the pattern in the input string
+            match = re.search(pattern, input_string)
+
+            if match:
+                # Extract the matched number and string from the regex match
+                number = match.group(1)
+                string_after_number = match.group(2)
+                
+                # Convert the extracted number to either integer or float
+                if '.' in number:
+                    number = float(number)
+                else:
+                    number = int(number)
+
+                return number, string_after_number
+            else:
+                # Return None if no match is found
+                return None, None
+        
+        
+        def get_return(df, event, date, length):
+            from datetime import datetime
+
+            interval_mapping_dict = {
+                "09:30:00":"09first",
+                "10:00:00":"FH",
+                "10:30:00":"10first",
+                "11:00:00":"10second",
+                "11:30:00":"11first",
+                "12:00:00":"11second",
+                "12:30:00":"12first",
+                "13:00:00":"12second",
+                "13:30:00":"13first",
+                "14:00:00":"13second",
+                "14:30:00":"14first",
+                "15:00:00":"14second",
+                "15:30:00":"SLH",
+                "16:00:00":"LH",
+                }
+
+            event_after_release_dict = {
+                "ISM": "10:30:00",
+                "FOMC": "14:30:00",
+                "NFP": "09:30:00",
+                "CPI": "09:30:00",
+                "GDP": "09:30:00",
+                "IP": "09:30:00",
+                "PI": "09:30:00",
+                "HST": "09:30:00",
+                "PPI": "09:30:00",
+            }
+
+
+            time = event_after_release_dict[event]
+
+            if length == 'fh':
+
+                if 'DT' in df.columns:
+                    dt = date + ' ' + time
+                    timestamp = pd.to_datetime(dt)
+                    return df.loc[df['DT'] == timestamp, 'RETURN'].values[0]
+                else:
+                    col_name = f'Return_{interval_mapping_dict[time]}'
+                    return df.loc[df['DATE'] == date, col_name].values[0]
+                
+            elif length == 'rod':
+                if 'DT' in df.columns:
+                    start_index = list(interval_mapping_dict.keys()).index(time)
+                    ret = 1
+                    for interval in list(interval_mapping_dict.keys())[start_index:]:
+                        dt = date + ' ' + interval
+                        timestamp = pd.to_datetime(dt)
+                        ret = ret * (1 + df.loc[df['DT'] == timestamp, 'RETURN'].values[0])
+                        
+                    return (ret - 1)
+                
+                else:
+                    start_index = list(interval_mapping_dict.keys()).index(time)
+                    ret = 1
+                    for interval in list(interval_mapping_dict.keys())[start_index:]:
+
+                        col_name = f'Return_{interval_mapping_dict[interval]}'
+                        ret = ret * (1 + df.loc[df['DATE'] == date, col_name].values[0])
+
+                    return (ret - 1)
+
+            else:
+                return None
+
+
+
+
+        # Extract the number and string from the surprise definition, returns None if no number is in there
+        surprise_def_num, surprise_def_string = extract_number_and_string(surprise_def)
+        
+        # Loop over events in event list for which surprise dummies must be added
+        for event in event_list:
+            # Loop over event dates for that particular event
+            for dates in event_date_dict[event]:
+                # Get the surprise value for a specific event for a specific date
+                surprise = get_surprise(df_events, dates, event)
+                fh_return = get_return(df, event, dates, 'fh')
+                rod_return = get_return(df, event, dates, 'rod')
+
+                # Check if there is a number in the surprise_def string, if not we just look at the string itself, 'general definitions' are implemented
+                if surprise_def_num is None:
+
+                    if surprise_def == 'absolute':
+
+                        if surprise is not None:
+                            if surprise > 0:
+                                if event in positive_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                                    
+                                elif event in negative_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                            
+                            elif surprise < 0:
+                                if event in positive_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                                elif event in negative_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            else:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                    elif surprise_def == 'marketfh':
+                        if fh_return is not None:
+                            if fh_return > 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            elif fh_return < 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                            else: 
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                        
+                    elif surprise_def == 'marketrod':
+                        if rod_return is not None:
+                            if rod_return> 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            elif rod_return< 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                            else: 
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                
+                # Implement number-specific logic (stdev and market return thresholds)
+                else:
+                    if surprise_def_string == 'stdev':
+                        if surprise is not None:
+                            if abs(surprise) < surprise_def_num:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                            elif surprise > 0:
+                                if event in positive_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                                elif event in negative_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                            elif surprise < 0:
+                                if event in positive_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                                elif event in negative_event_list:
+                                    df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            else:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                    elif surprise_def_string == 'marketfh':
+                        if fh_return is not None:
+                            if abs(fh_return) < surprise_def_num:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                            elif fh_return > 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            elif fh_return < 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+                        
+                    elif surprise_def_string == 'marketrod':
+                        if rod_return is not None:
+                            if abs(rod_return) < surprise_def_num:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 0
+                            elif rod_return > 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = 1
+                            elif rod_return < 0:
+                                df.loc[df['DATE'] == dates, f'{event}_surprise_{surprise_def}'] = -1
+        
+        # Change back the DATE column to its original format if necessary
+        if date_trans:
+            df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d").dt.date
+
+        dict_in[key] = df
 
     return dict_in
