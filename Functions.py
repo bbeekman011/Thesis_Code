@@ -593,7 +593,7 @@ def intraday_barplot(
                 x_neg_event,
                 event_neg_grouped[metric],
                 width=bar_width,
-                label=f"Negative {event} Days (n={n_neg})",
+                label=f"Negative {surprise_col} {event} Days (n={n_neg})",
                 color="red",
             )
             counter += 1
@@ -604,7 +604,7 @@ def intraday_barplot(
                 x_pos_event,
                 event_pos_grouped[metric],
                 width=bar_width,
-                label=f"Positive {event} Days (n={n_pos})",
+                label=f"Positive {surprise_col} {event} Days (n={n_pos})",
                 color="green",
             )
             counter += 1
@@ -615,7 +615,7 @@ def intraday_barplot(
                 x_neu_event,
                 event_neu_grouped[metric],
                 width=bar_width,
-                label=f"Neutral {event} Days (n={n_neu})",
+                label=f"Neutral {surprise_col} {event} Days (n={n_neu})",
                 color="orange",
             )
             counter += 1
@@ -702,7 +702,9 @@ def intraday_barplot(
     plt.legend()
 
     plt.tight_layout()
-    plt.show()
+    ax = plt.gca()  # Get the current axis object
+    return ax
+    
 
 
 def event_date_transformation(df, start_date: str, end_date: str):
@@ -1054,3 +1056,181 @@ def add_surprise_dummies(dict_in, event_dict, event_df, event_list, surprise_def
         dict_in[key] = df
 
     return dict_in
+
+
+def create_grid_barplots(plot_title, dict_in, tickers, metrics, events, start_date, end_date, non_event_def, lag_bar, lag_num, surprise_split, surprise_col):
+    from PIL import Image
+    import math
+    import matplotlib.pyplot as plt
+    import os
+    num_plots = len(tickers) * len(metrics) * len(events)
+    num_rows = len(tickers)
+    num_cols = math.ceil(num_plots / num_rows)  
+
+    # Create a figure with appropriate number of subplots
+    # fig, axs = plt.subplots(num_rows, num_cols, figsize=(5*num_cols, 5*num_rows))
+
+    plot_index = 0
+    for i, ticker in enumerate(tickers):
+        for j, metric in enumerate(metrics):
+            for k, event in enumerate(events):
+
+                # Generate the plot
+                intraday_barplot(
+                    dict_in,
+                    ticker,
+                    metric,
+                    start_date,
+                    end_date,
+                    event,
+                    non_event_def=non_event_def,
+                    lag_bar=lag_bar,
+                    lag_num=lag_num,
+                    surprise_split=surprise_split,
+                    surprise_col=surprise_col
+                )
+                    
+
+                # Save the plot as an image
+                plt.savefig(f"plot_{plot_index}.png")
+                plt.close()
+                plot_index += 1
+
+    
+
+    # Combine the images into a single figure
+    images = [Image.open(f"plot_{i}.png") for i in range(plot_index)]
+    widths, heights = zip(*(i.size for i in images))
+
+    max_height = max(heights)
+    max_width = max(widths)
+    cell_width = max_width 
+    cell_height = max_height 
+
+    total_height = cell_height * num_rows
+
+    new_im = Image.new('RGB', (max_width * num_cols, total_height))
+
+    for i, im in enumerate(images):
+    # Calculate grid position
+        col_index = i % num_cols
+        row_index = i // num_cols
+
+        # Calculate paste coordinates
+        paste_x = col_index * cell_width
+        paste_y = row_index * cell_height
+
+        # Paste image onto new_im
+        new_im.paste(im, (paste_x, paste_y))
+
+    # Save the image
+    save_path = r'C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/Combined Plots/'
+    new_im.save(f'{save_path}{plot_title}.png')
+    # Display the combined image
+    # new_im.show()
+    for i in range(plot_index):
+        os.remove(f"plot_{i}.png")
+
+    return new_im
+
+
+
+def scale_vars(df_in, vars_to_scale, inplace=True):
+    """Function used to scale a specified set of columns in a dataframe using sklearn StandardScaler
+    Parameters:
+    df_in: dataframe containing columns which need to be scaled
+    vars_to_scale: list of column names specifying which columns need to be scaled
+    Returns:
+    df: original dataframe with specified columns scaled
+    """
+    import pandas as pd
+    from sklearn.preprocessing import StandardScaler 
+
+    df = df_in.copy()
+    scaler = StandardScaler()
+
+    scaled_df = pd.DataFrame(scaler.fit_transform(df[vars_to_scale]), columns=vars_to_scale)
+    if inplace:
+        df[vars_to_scale] = scaled_df[vars_to_scale]
+    else:
+        for var in vars_to_scale:
+            df[f'{var}_scaled'] = scaled_df[var]
+
+            
+    return df
+
+
+def do_regression(df_in, indep_vars, dep_vars, cov_type):
+    import statsmodels.api as sm
+
+    df = df_in.copy()
+
+    df.dropna(subset=indep_vars+[dep_vars], inplace=True)
+    x = df[indep_vars]
+    y = df[dep_vars]
+
+    x = sm.add_constant(x)
+
+    model =sm.OLS(y, x)
+    results = model.fit(cov_type=cov_type)
+
+    return results
+
+
+
+
+
+
+def get_latex_table(result_dict, dep_vars, indep_vars):
+    
+    import pandas as pd
+
+    result_df = pd.DataFrame(index = result_dict.keys(), columns= indep_vars + ['R-squared'])
+    for name in result_dict.keys():
+        results = result_dict[name]
+        
+
+        for var in indep_vars:
+            coef = results.params[var]
+            std_error = results.bse[var]
+
+            p_value = results.pvalues[var]
+            if p_value < 0.01:
+                significance = "***"
+            elif 0.01 <= p_value < 0.05:
+                significance = "**"
+            elif 0.05 <= p_value < 0.1:
+                significance = "*"
+            else:
+                significance = ""
+            
+            result_df.loc[name, var] = f"\\begin{{tabular}}[c]{{@{{}}c@{{}}}}{coef:.4f}{significance} \\\ ({std_error:.4f})\\end{{tabular}}"
+        
+        result_df.loc[name, 'R-squared'] = f"{results.rsquared:.4f}"
+        
+
+    
+    result_df.columns = result_df.columns.str.replace('_', '\\_')
+    result_df = result_df.T
+    
+
+    latex_table = result_df.to_latex(caption=f'Table with regression results of {dep_vars}')
+    latex_table = r'\resizebox{\textwidth}{!}{' + latex_table + '}'
+    return latex_table, result_df
+    
+
+
+def show_reg_results(result_dict, ticker=None):
+    if ticker is None:
+        for ticker in result_dict.keys():
+            summary = result_dict[ticker].summary()
+            print(f'Regression results for {ticker}: {summary}')
+    else:
+        summary = result_dict[ticker].summary()
+        print(f'Regression results for {ticker}: {summary}')
+
+def add_lag(df_in, var, lag_num):
+    df = df_in.copy()
+    df[f'{var}_lag{lag_num}'] = df[var].shift(lag_num)
+
+    return df

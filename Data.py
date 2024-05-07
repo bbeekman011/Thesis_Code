@@ -2,12 +2,7 @@
 import pyreadr
 import pandas as pd
 from collections import OrderedDict
-from Functions import (
-    split_df_on_symbol,
-    merge_df_on_vol_columns,
-    merge_df_on_price_rows,
-    fill_missing_intervals,
-)
+from Functions import *
 from datetime import datetime, timedelta
 import numpy as np
 import time as tm
@@ -189,13 +184,104 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 # %%
 # %%
 # Save the current 30-minute interval dictionary to a pickle
-with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
-    pickle.dump(etf_merged_30min_halfhourly_dict, f)
+# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_halfhourly_dict.pkl", "wb") as f:
+#     pickle.dump(etf_merged_30min_halfhourly_dict, f)
 
-with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl", "wb") as f:
-    pickle.dump(etf_merged_30min_daily_dict, f)
-
-
+# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl", "wb") as f:
+#     pickle.dump(etf_merged_30min_daily_dict, f)
 
 
+
+###############################################################################################################################################################
+# %% Open the data processed in Analytics
+
+with open(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly.pkl",
+    "rb",
+) as f:
+    etf_sel_halfhourly = pickle.load(f)
+
+with open(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily.pkl",
+    "rb",
+) as f:
+    etf_sel_daily = pickle.load(f)
+
+
+#%% Load nav data
+df_nav = pd.read_csv(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\NAV_data.csv"
+)
+
+# Rename date and NAV column
+rename_dict = {
+    'caldt': 'DATE',
+    'dnav' : 'NAV',
+}
+
+df_nav.rename(columns=rename_dict, inplace=True)
+# Split into different dictionaries
+nav_dict = split_df_on_symbol(df_nav, "ticker")
+# sort the dates properly
+for key in nav_dict.keys():
+    nav_dict[key]['DATE'] = pd.to_datetime(nav_dict[key]['DATE'], format='%d/%m/%Y')
+    nav_dict[key] = nav_dict[key].sort_values(by='DATE').reset_index(drop=True)
+    nav_dict[key]['DATE'] = nav_dict[key]['DATE'].dt.strftime('%Y-%m-%d')
+
+#%%
+# Add cumulative returns
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key]['cum_ret_factor'] = etf_sel_halfhourly[key]['RETURN'] + 1
+    etf_sel_halfhourly[key]['cum_ret'] = etf_sel_halfhourly[key].groupby('DATE')['cum_ret_factor'].cumprod() - 1
+    etf_sel_halfhourly[key].drop(columns=['cum_ret_factor'], inplace=True)
+    # Add lag
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'cum_ret', 1)
+
+
+# Add NAV to general dataframes
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+    df_nav = nav_dict[key].copy()
+    df_nav = df_nav.drop(columns=['crsp_fundno', 'dret'])
+    merged = pd.merge(
+        df,
+        df_nav,
+        on='DATE',
+        suffixes=("", "NAV"),
+    )
+    
+    
+    etf_sel_halfhourly[key] = merged
+
+#%%    
+# Add lagged NAV
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'NAV', 14)
+
+#%%
+# Add Price-NAV Ratio
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+
+    price_16_df = df[df['TIME'] == '16:00:00'][['DATE', 'PRICE']]
+
+    merged = pd.merge(df, price_16_df, on='DATE', suffixes=('', '_16'))
+
+    merged['PRICE/NAV'] = merged['PRICE_16']/merged['NAV']
+    merged = merged.drop(columns=['PRICE_16'])
+    etf_sel_halfhourly[key] = merged
+
+#%%
+# Add lagged Price-NAV Ratio
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'PRICE/NAV', 14)
+
+
+# %%
+## Save to pickle files
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly.pkl", "wb") as f:
+    pickle.dump(etf_sel_halfhourly, f)
+
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily.pkl", "wb") as f:
+    pickle.dump(etf_sel_daily, f)
 # %%
