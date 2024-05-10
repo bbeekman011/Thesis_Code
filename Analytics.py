@@ -15,10 +15,11 @@ from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
 import os
 import math
-from sklearn.preprocessing import StandardScaler 
+from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.stattools import adfuller
+
 # %% ## Load data pre-processed through Data file (no additional analysis or variables present)
- 
+
 
 # Load data with intervals on the rows
 with open(
@@ -40,23 +41,39 @@ df_events = pd.read_excel(
 )
 
 
-
-#%% Load data with event column and other operations already there
+# %% Load data as per 10-05-2024
 
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240510.pkl",
     "rb",
 ) as f:
     etf_sel_halfhourly = pickle.load(f)
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl",
     "rb",
 ) as f:
     etf_sel_daily = pickle.load(f)
 
-#%% # Define some dictionaries for mapping
+
+#%% # Make selection of ETFs to investigate
+
+included_etfs = ["AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"]
+
+etf_sel_daily = {
+    key: etf_merged_30min_daily_dict[key]
+    for key in included_etfs
+    if key in etf_merged_30min_daily_dict
+}
+etf_sel_halfhourly = {
+    key: etf_merged_30min_halfhourly_dict[key]
+    for key in included_etfs
+    if key in etf_merged_30min_halfhourly_dict
+}
+
+# %% # Define some dictionaries for mapping
+
 etf_dict = {
     "AGG": "iShares Core U.S. Aggregate Bond ETF",
     "BND": "Vanguard Total Bond Market ETF",
@@ -150,7 +167,7 @@ event_after_release_dict = {
     "PPI": "09:30:00",
 }
 
-intervals = etf_sel_halfhourly['AGG']['TIME'].unique()
+intervals = etf_sel_halfhourly["AGG"]["TIME"].unique()
 # %% # Get rid of short ratio in 09:30:00 column and of infinite values (temporary fix for infinite values until discussed further)
 
 
@@ -168,21 +185,9 @@ end_date = "2022-12-31"
 
 df_events = event_date_transformation(df_events, start_date, end_date)
 
-# %% ## Make selection of ETFs to be investigated for preliminary analysis
 
 
-included_etfs = ["AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"]
 
-etf_sel_daily = {
-    key: etf_merged_30min_daily_dict[key]
-    for key in included_etfs
-    if key in etf_merged_30min_daily_dict
-}
-etf_sel_halfhourly = {
-    key: etf_merged_30min_halfhourly_dict[key]
-    for key in included_etfs
-    if key in etf_merged_30min_halfhourly_dict
-}
 # %% ## Add dummy variables for different events, see events specified in event_dict
 
 etf_sel_halfhourly = add_event_dummies(etf_sel_halfhourly, df_events, event_dict, 0)
@@ -205,9 +210,13 @@ etf_sel_halfhourly = add_surprise_dummies(
 etf_sel_halfhourly = add_surprise_dummies(
     etf_sel_halfhourly, event_dict, df_events, event_list, "2_stdev"
 )
-etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, 'marketfh')
+etf_sel_halfhourly = add_surprise_dummies(
+    etf_sel_halfhourly, event_dict, df_events, event_list, "marketfh"
+)
 # etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '0.0025_marketfh')
-etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, 'marketrod')
+etf_sel_halfhourly = add_surprise_dummies(
+    etf_sel_halfhourly, event_dict, df_events, event_list, "marketrod"
+)
 # etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '0.0025_marketrod')
 # etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '0.005_marketfh')
 # etf_sel_halfhourly = add_surprise_dummies(etf_sel_halfhourly, event_dict, df_events, event_list, '0.005_marketrod')
@@ -244,10 +253,10 @@ for key in etf_sel_daily.keys():
         etf_sel_daily[key], suffix_list, short_ratio, "Short", "Volume", "Short_Ratio"
     )
 
-#%% Add lagged variables
+# %% Add lagged variables
 # Add 1-interval return lags
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'RETURN', 1)
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], "RETURN", 1)
 # Add interval dummies to the halfhourly dataframe
 
 intervals = etf_sel_halfhourly["AGG"]["TIME"].unique()
@@ -259,44 +268,102 @@ for key in etf_sel_halfhourly.keys():
         ).astype(int)
 
 # Add event-interval interaction dummies
-for key in etf_sel_halfhourly.keys():       
+for key in etf_sel_halfhourly.keys():
     for interval in intervals:
-        for event in ['FOMC', 'ISM']:
-            etf_sel_halfhourly[key][f'd_{event}_{interval}'] = etf_sel_halfhourly[key][f'd_{interval}'] * etf_sel_halfhourly[key][event]
+        for event in ["FOMC", "ISM"]:
+            etf_sel_halfhourly[key][f"d_{event}_{interval}"] = (
+                etf_sel_halfhourly[key][f"d_{interval}"]
+                * etf_sel_halfhourly[key][event]
+            )
 
-#%% # Add interval-lagreturn interaction
+#%% abn_short lag
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], "abn_short_scaled", 15)
+
+# %% # Add interval-lagreturn interaction
 
 for key in etf_sel_halfhourly.keys():
     for interval in intervals:
-        etf_sel_halfhourly[key][f'i_lagReturn_{interval}'] = etf_sel_halfhourly[key][f'd_{interval}'] * etf_sel_halfhourly[key]['RETURN_lag1']
+        etf_sel_halfhourly[key][f"i_lagReturn_{interval}"] = (
+            etf_sel_halfhourly[key][f"d_{interval}"]
+            * etf_sel_halfhourly[key]["RETURN_lag1"]
+        )
 
-#%% # Get cumulative returns column
+# %% # Get cumulative returns column
 
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key]['cum_ret_factor'] = etf_sel_halfhourly[key]['RETURN'] + 1
-    etf_sel_halfhourly[key]['cum_ret'] = etf_sel_halfhourly[key].groupby('DATE')['cum_ret_factor'].cumprod() - 1
-    etf_sel_halfhourly[key].drop(columns=['cum_ret_factor'], inplace=True)
+    etf_sel_halfhourly[key]["cum_ret_factor"] = etf_sel_halfhourly[key]["RETURN"] + 1
+    etf_sel_halfhourly[key]["cum_ret"] = (
+        etf_sel_halfhourly[key].groupby("DATE")["cum_ret_factor"].cumprod() - 1
+    )
+    etf_sel_halfhourly[key].drop(columns=["cum_ret_factor"], inplace=True)
     # Add lag
-    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'cum_ret', 1)
-
-#%%
-
-#%% ## Add scaled Volume and Short 
-
-vars_scale = ['Volume', 'Short', 'Volume_dollar', 'Short_dollar', 'RETURN', 'cum_ret', 'cum_ret_lag1']
-
-for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = scale_vars(etf_sel_halfhourly[key], vars_scale, inplace=False)
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], "cum_ret", 1)
 
 
-#%% ## Do augmented Dickey-Fuller
+# %% Add realized variance
+
 
 for key in etf_sel_halfhourly.keys():
 
-    X = etf_sel_halfhourly[key]['Short_scaled'].values
+    df = etf_sel_halfhourly[key].copy()
+    df["sq_ret"] = df["RETURN"] ** 2
+    date_list = df["DATE"].unique()
+
+    for day in date_list:
+
+        date_index = np.where(date_list == day)[0][0]
+        if date_index == 0:
+            df.loc[df["DATE"] == day, "prev_day_rv"] = 0
+        else:
+            prev_day = date_list[date_index - 1]
+            sumsq_ret = df[df["DATE"] == prev_day]["sq_ret"].sum()
+            df.loc[df["DATE"] == day, "prev_day_rv"] = np.sqrt(sumsq_ret)
+
+    etf_sel_halfhourly[key] = df
+
+# %% # Add average realized variance
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_rolling_window_average_col(
+        etf_sel_halfhourly[key], "prev_day_rv", 5, "DT"
+    )
+# %% ## Add scaled Volume and Short
+
+vars_scale = [
+    "Volume",
+    "Short",
+    "Volume_dollar",
+    "Short_dollar",
+    "RETURN",
+    "cum_ret",
+    "cum_ret_lag1",
+    # "PRICE/NAV",
+    # "PRICE/NAV_lag",
+    "prev_day_rv",
+    "prev_day_rv_Average_5day",
+    # "RETURN",
+]
+
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = scale_vars_exp_window(
+        etf_sel_halfhourly[key], vars_scale, StandardScaler(), 100
+    )
+
+# %% Add scaled NAV ratios
+vars_scale = ["PRICE/NAV", "PRICE/NAV_lag14"]
+
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = scale_vars_exp_window(
+        etf_sel_halfhourly[key], vars_scale, StandardScaler(), 100
+    )
+# %% ## Do augmented Dickey-Fuller
+
+for key in etf_sel_halfhourly.keys():
+
+    X = etf_sel_halfhourly[key]["Short_scaled"].values
     result = adfuller(X)
-    print(f'ADF Statistic {key}: %f' % result[0])
-    print(f'p-value {key}: %f' % result[1])
+    print(f"ADF Statistic {key}: %f" % result[0])
+    print(f"p-value {key}: %f" % result[1])
 
 # %% ## Get event counts
 
@@ -336,8 +403,8 @@ for abbr in abbr_list:
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
 
 ticker = "HYG"  # Choose from "AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"
-metric = "Short_Ratio"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
-event = "ISM"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
+metric = "abn_short_scaled"  # Choose from "Short", "Short_dollar", "Volume", "Volume_dollar", "Short_Ratio", "RETURN"
+event = "FOMC"  # Choose from "ISM", "FOMC", "NFP", "CPI", "GDP", "IP", "PI", "HST", "PPI", "EVENT" or any of the lags, e.g. ISM_lag
 start_date = "2014-01-01"
 end_date = "2022-12-31"
 non_event_def = True  # Set to True if non-event is defined as no events at all, set to False if non-event is defined as no other event of that specific event (so other events are counted as non-event)
@@ -371,11 +438,11 @@ non_event_def = True  # Set to True if non-event is defined as no events at all,
 lag_bar = False  # Set to True if you want to show a bar with the lagged metric, does not work in combination with surprise_split
 lag_num = 1  # Specify number of lags, make sure that the columns with these lag dummies are actually added to the dataframes.
 surprise_split = True  # Set to True if the plot should show the negative and positive surprises separately, surprise type is defined in surprise_col
-surprise_col = "surprise_0.001_marketfh"  # Choose from options which are added above, e.g. 'absolute', '1_stdev' etc. for measures based on
+surprise_col = "surprise_2_stdev"  # Choose from options which are added above, e.g. 'absolute', '1_stdev' etc. for measures based on
 # The analyst surprise, and 'marketfh', '0.001_marketfh', 'marketrod' etc. for market based surprise measure
 
 
-preset = "Credits"  # Choose from 'Treasuries', 'SPY_FI', and 'Credits'
+preset = "Treasuries"  # Choose from 'Treasuries', 'SPY_FI', and 'Credits'
 
 if preset == "Treasuries":
     ticker_list = ["SHY", "IEF", "TLT"]
@@ -384,9 +451,9 @@ elif preset == "SPY_FI":
 elif preset == "Credits":
     ticker_list = ["HYG", "LQD"]
 
-metric_list = ["Short", "Short_Ratio", "RETURN"]
+metric_list = ["Short", "abn_short_scaled", "RETURN"]
 event_list = ["ISM"]
-plot_title = f"{preset}_{event_list[0]}_0.001"
+plot_title = f"{preset}_{event_list[0]}_abnormal_2stdev"
 image = create_grid_barplots(
     plot_title,
     etf_sel_halfhourly,
@@ -403,9 +470,7 @@ image = create_grid_barplots(
 )
 
 
-
-
-#%%  ## Get 5, 10 and 20 and 100 trading day rolling-windows of short volume
+# %%  ## Get 5, 10 and 20 and 100 trading day rolling-windows of short volume
 
 
 for key in etf_sel_halfhourly.keys():
@@ -424,7 +489,6 @@ for key in etf_sel_halfhourly.keys():
 
 
 # %% ## Get deviations from averages
-
 
 
 def add_abn_col(df_in, var, window_size, new_col_name):
@@ -514,17 +578,16 @@ plt.tight_layout()
 plt.show()
 
 
-
 # %% ## Make time series plot for specific period and variables
 
 ticker = "AGG"
 df = etf_sel_halfhourly[ticker]
-start_date = "2022-05-02"
-end_date = "2022-05-04"
+start_date = "2015-01-16"
+end_date = "2015-01-16"
 title = ticker
-y_1 = "PRICE"
-y_2 = "Short_Ratio"
-vert_line = "2022-05-04 14:00:00"
+y_1 = "abn_short_scaled"
+y_2 = "PRICE"
+vert_line = "2015-01-16 13:30:00"
 
 
 test_fig = intraday_plot(
@@ -540,28 +603,60 @@ test_fig = intraday_plot(
     y_2,
     y_2,
     y_2,
+    # vert_line,
 )
 test_fig.show()
 
-
+# %%
+for key in etf_sel_halfhourly.keys():
+    mean = etf_sel_halfhourly[key]["PRICE/NAV"].mean()
+    stdev = etf_sel_halfhourly[key]["PRICE/NAV"].std()
+    min = etf_sel_halfhourly[key]["PRICE/NAV"].min()
+    max = etf_sel_halfhourly[key]["PRICE/NAV"].max()
+    print(
+        f"Stats for {key}:\n"
+        f"            mean: {mean}\n"
+        f"          stdev: {stdev}\n"
+        f"          min: {min}\n"
+        f"          max: {max}"
+    )
 # %% ## Code to get many plots, either print and save or display them
 
 
-
 ## Specify parameters for the plotting function
+ticker = "LQD"
+
+def get_extreme_values(df_in, column_name, percentile):
+
+
+    # number of observations related to percentile
+    n = int(len(df_in) * (percentile / 100))
+
+    highest_indices = df_in[column_name].abs().nlargest(n).index
+    highest_dates = df_in.loc[highest_indices, 'DT']
+    highest_values = df_in[column_name].abs().nlargest(n).values
+    
+
+    # lowest_indices = df_in[column_name].nsmallest(n).index
+    # lowest_values = df_in[column_name].nsmallest(n).values
+
+    return highest_dates.tolist(), highest_values.tolist()
+
+results = get_extreme_values(etf_sel_halfhourly[ticker], 'abn_short_scaled', 0.02)
+event_date_list = [timestamp.strftime('%Y-%m-%d %H:%M:%S') for timestamp in results[0]]
 # List of event dates to be evaluated
-event_dt_list = ["2020-03-03 14:00:00"]
+event_dt_list = event_date_list
 
 col_list = [
-    "Volume"
+    "abn_short_scaled"
 ]  # y1 variables to be included in the plots, if you input multiple variables, a plot will be created for each of them
 y_2 = "PRICE"  # y2 variable to be included in the plots, this is just a string input, so it does not support multiple inputs as the y1
 etf_list = [
-    "SPY"
+    ticker
 ]  # List of ETFs to be plotted, a plot will be created for each of the ETFs
-day_range = 2  # Range of days around the event date
-display_dummy = True  # Dummy, if True the plots will be plotted, if False, the plots will be saved to a specified directory
-parent_dir = r"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/CPI"  # Specify parent directory (only necessary if display_dummy = False)
+day_range = 5 # Range of days around the event date
+display_dummy = False  # Dummy, if True the plots will be plotted, if False, the plots will be saved to a specified directory
+parent_dir = rf"C:/Users/ROB7831/OneDrive - Robeco Nederland B.V/Documents/Thesis/Plots/Events/{ticker}"  # Specify parent directory (only necessary if display_dummy = False)
 
 
 ## Get plots of the selected etfs for pre-defined day range and for selected variables in col_list
@@ -574,6 +669,7 @@ get_eventday_plots(
     y_2,
     day_range,
     display_dummy,
+    parent_dir
 )
 
 # %% ## Get years and weekdays column in dataframes
@@ -711,15 +807,22 @@ for key in etf_sel_daily.keys():
     etf_sel_daily[key]["Volume_FDNLH"] = etf_sel_daily[key][col_list_ave].mean(axis=1)
 
 
-#%% # 
+# %% #
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key]['RETURN_100'] = etf_sel_halfhourly[key]['RETURN'] * 100
 
-
-#%% # Do regressions
+# %% Do regressions
 
 # Specify regression parameters
-dep_vars = "Short_scaled"
+dep_vars = "Short_scaled_exp"
 
-indep_vars = ["Volume_scaled", "cum_ret_scaled"]
+indep_vars = [
+    "Volume_scaled_exp",
+    "cum_ret_scaled_exp",
+    "PRICE/NAV_lag14_scaled_exp",
+    "prev_day_rv_Average_5day_scaled_exp",
+]
+
 for interval in intervals:
     indep_vars.append(f"d_{interval}")
 
@@ -737,22 +840,53 @@ cov_type = "HC1"
 # Perform regressions
 regression_result_dict = {}
 for key in etf_sel_halfhourly.keys():
-    regression_result_dict[key] = do_regression(etf_sel_halfhourly[key], indep_vars, dep_vars, cov_type)
+    regression_result_dict[key] = do_regression(
+        etf_sel_halfhourly[key], indep_vars, dep_vars, cov_type
+    )
 
-#%% Show results for regression results. Ticker is None prints all results
+# Show results for regression results. Ticker is None prints all results
 ticker = None
 
 
 show_reg_results(regression_result_dict, ticker)
 
-
 #%%
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+    resid = regression_result_dict[key].resid.copy()
+    resid.reindex(df.index, fill_value=np.nan)
+
+
+    df['abn_short_scaled'] = resid
+
+    etf_sel_halfhourly[key] = df
+
+# %%
 # Get latex table
-latex_table, result_df = get_latex_table(regression_result_dict, dep_vars, indep_vars) 
+latex_table, result_df = get_latex_table(regression_result_dict, dep_vars, indep_vars)
 
 print(latex_table)
 
 
 
-
 # %%
+threshold = 10
+
+abn_date_dict = {}
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+    filter_df = df[abs(df['abn_short_scaled']) > threshold]
+
+    count = filter_df.shape[0]
+    indices = filter_df.index.tolist()
+    dates = df.loc[indices, 'DT']
+    abn_date_dict[key] = dates
+    print(f'{key}: # times above threshold {threshold}: {count}')
+
+
+
+
+
+
+
+

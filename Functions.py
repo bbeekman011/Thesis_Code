@@ -54,9 +54,16 @@ def merge_df_on_vol_columns(
 
     for key in merger_dict.keys():
 
-        df1 = merge_dict[key]
-        df2 = merger_dict[key]
+        df1 = merge_dict[key].copy()
+        df2 = merger_dict[key].copy()
 
+
+        if isinstance(df1[date_string][0], str):
+            df1[date_string] = pd.to_datetime(df1[date_string]).dt.date
+
+        if isinstance(df2[date_string][0], str):
+            df2[date_string] = pd.to_datetime(df2[date_string]).dt.date
+        
         date_threshold = max(
             df1[date_string][0], df2[date_string][0]
         )  # Specify date threshold, based on earliest available data in either prices or volume
@@ -82,6 +89,8 @@ def merge_df_on_vol_columns(
             merged_df[column_name] = temp_df[return_string]
 
         merged_df.rename(columns=rename_col_dict, inplace=True)
+
+        
 
         output_dict[key] = merged_df
 
@@ -354,8 +363,9 @@ def get_eventday_plots(
             import os
 
             parent_dir = parent_dir
-            new_dir = event_date
-            path = os.path.join(parent_dir, new_dir)
+            # new_dir = event_date
+            # path = os.path.join(parent_dir, new_dir)
+            path = parent_dir
             if not os.path.exists(path):
                 os.mkdir(path)
 
@@ -1135,29 +1145,31 @@ def create_grid_barplots(plot_title, dict_in, tickers, metrics, events, start_da
 
 
 
-def scale_vars(df_in, vars_to_scale, inplace=True):
-    """Function used to scale a specified set of columns in a dataframe using sklearn StandardScaler
-    Parameters:
-    df_in: dataframe containing columns which need to be scaled
-    vars_to_scale: list of column names specifying which columns need to be scaled
-    Returns:
-    df: original dataframe with specified columns scaled
-    """
-    import pandas as pd
-    from sklearn.preprocessing import StandardScaler 
+# def scale_vars(df_in, vars_to_scale, inplace=True):
+#     """Function used to scale a specified set of columns in a dataframe using sklearn StandardScaler
+#     Parameters:
+#     df_in: dataframe containing columns which need to be scaled
+#     vars_to_scale: list of column names specifying which columns need to be scaled
+#     Returns:
+#     df: original dataframe with specified columns scaled
+#     """
+#     import pandas as pd
+#     from sklearn.preprocessing import StandardScaler 
 
-    df = df_in.copy()
-    scaler = StandardScaler()
+#     df = df_in.copy()
+#     scaler = StandardScaler()
 
-    scaled_df = pd.DataFrame(scaler.fit_transform(df[vars_to_scale]), columns=vars_to_scale)
-    if inplace:
-        df[vars_to_scale] = scaled_df[vars_to_scale]
-    else:
-        for var in vars_to_scale:
-            df[f'{var}_scaled'] = scaled_df[var]
+#     scaled_df = pd.DataFrame(scaler.fit_transform(df[vars_to_scale]), columns=vars_to_scale)
+#     if inplace:
+#         df[vars_to_scale] = scaled_df[vars_to_scale]
+#     else:
+#         for var in vars_to_scale:
+#             df[f'{var}_scaled'] = scaled_df[var]
 
             
-    return df
+#     return df
+
+
 
 
 def do_regression(df_in, indep_vars, dep_vars, cov_type):
@@ -1192,7 +1204,7 @@ def get_latex_table(result_dict, dep_vars, indep_vars):
 
         for var in indep_vars:
             coef = results.params[var]
-            std_error = results.bse[var]
+            t_stats = results.tvalues[var]
 
             p_value = results.pvalues[var]
             if p_value < 0.01:
@@ -1204,7 +1216,7 @@ def get_latex_table(result_dict, dep_vars, indep_vars):
             else:
                 significance = ""
             
-            result_df.loc[name, var] = f"\\begin{{tabular}}[c]{{@{{}}c@{{}}}}{coef:.4f}{significance} \\\ ({std_error:.4f})\\end{{tabular}}"
+            result_df.loc[name, var] = f"\\begin{{tabular}}[c]{{@{{}}c@{{}}}}{coef:.4f}{significance} \\\ ({t_stats:.4f})\\end{{tabular}}"
         
         result_df.loc[name, 'R-squared'] = f"{results.rsquared:.4f}"
         
@@ -1214,8 +1226,8 @@ def get_latex_table(result_dict, dep_vars, indep_vars):
     result_df = result_df.T
     
 
-    latex_table = result_df.to_latex(caption=f'Table with regression results of {dep_vars}')
-    latex_table = r'\resizebox{\textwidth}{!}{' + latex_table + '}'
+    latex_table = result_df.to_latex(caption=f'Table with regression results of {dep_vars}. T-statistics are between brackets. *, ** and *** indicate significance at 10, 5 and 1\% respectively.')
+    
     return latex_table, result_df
     
 
@@ -1233,4 +1245,55 @@ def add_lag(df_in, var, lag_num):
     df = df_in.copy()
     df[f'{var}_lag{lag_num}'] = df[var].shift(lag_num)
 
+    return df
+
+class WalkForwardTransformer():
+    
+    def __init__(self,transformer,n_roll,method='<t'):
+        self.transformer = transformer
+        self.method = method
+        self.n_roll = n_roll
+        return 
+    
+    def generate_walkforward_chunks(self, X):
+        start_index = max(0, self.n_roll)  # Ensure at least n_roll observations are available
+        for i in range(start_index, len(X)):
+            yield X.iloc[:i+1]
+            
+    def transform(self, X: pd.DataFrame, verbose=0):
+        ix = X.index[self.n_roll:]
+        Xgen = self.generate_walkforward_chunks(X)
+        Z = []
+        for i,Xi in enumerate(Xgen): 
+            if self.method=='<t':
+                self.transformer.fit(Xi.iloc[:-1])
+            elif self.method=='<=t':
+                self.transformer.fit(Xi)
+            else: 
+                raise NotImplementedError(self.method)
+            Xil = Xi.iloc[[-1]]
+            Zil = self.transformer.transform(Xil)
+            Z.append(Zil.tolist()[0])
+            if verbose==1: 
+                print('Progress: %0.2f%%'%((i+1)*100./(len(X)-self.n_roll)),end='\r')
+        Z = pd.DataFrame(Z,index=ix,columns=X.columns)
+        return Z 
+
+
+def scale_vars_exp_window(df_in, scale_vars, scaler, n_roll, method="<=t", inplace=False):
+    import pandas as pd
+    from sklearn.preprocessing import StandardScaler
+
+    df = df_in.copy()
+    wft = WalkForwardTransformer(scaler,method=method,n_roll=n_roll)
+    df_scaled = wft.transform(df[scale_vars], verbose=1)
+
+
+    if inplace:
+        df[scale_vars] = df_scaled[scale_vars]
+    else:
+        for var in scale_vars:
+            df[f'{var}_scaled_exp'] = df_scaled[var]
+
+            
     return df

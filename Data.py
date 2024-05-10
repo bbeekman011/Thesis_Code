@@ -196,13 +196,13 @@ for key in etf_merged_30min_halfhourly_dict.keys():
 # %% Open the data processed in Analytics
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240510.pkl",
     "rb",
 ) as f:
     etf_sel_halfhourly = pickle.load(f)
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl",
     "rb",
 ) as f:
     etf_sel_daily = pickle.load(f)
@@ -279,9 +279,9 @@ for key in etf_sel_halfhourly.keys():
 
 # %%
 ## Save to pickle files
-with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly.pkl", "wb") as f:
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240510.pkl", "wb") as f:
     pickle.dump(etf_sel_halfhourly, f)
 
-with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily.pkl", "wb") as f:
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl", "wb") as f:
     pickle.dump(etf_sel_daily, f)
 # %%
