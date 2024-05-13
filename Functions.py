@@ -1297,3 +1297,79 @@ def scale_vars_exp_window(df_in, scale_vars, scaler, n_roll, method="<=t", inpla
 
             
     return df
+
+def get_extreme_values(df_in, column_name, percentile, direction):
+
+
+    # number of observations related to percentile
+    n = int(len(df_in) * (percentile / 100))
+    if direction == "highest":
+        indices = df_in[column_name].abs().nlargest(n).index
+        dates = df_in.loc[indices, 'DT']
+        values = df_in[column_name].abs().nlargest(n).values
+        return dates.tolist(), values.tolist()
+    
+    elif direction == "lowest":
+        indices = df_in[column_name].abs().nsmallest(n).index
+        dates = df_in.loc[indices, 'DT']
+        values = df_in[column_name].abs().nsmallest(n).values
+        return dates.tolist(), values.tolist()
+    else:
+        print("Incorrect direction argument passed, please pass: 'highest' or 'lowest'.")
+        return None
+
+
+def add_future_ret(df_in, count, interval_type, EOD_dummy=False, start_lead=0):
+    """
+    Function to add column with future cumulative returns for pre-specified number of days and specification for EOD or not. Here if EOD is true, the cumulative returns 
+    until EOD and then a full day will be calculated. The start_lead variable specifies if the cumulative return is calculated from the time of the respective row, or if a lag is
+    introduced, so e.g. starting from 1 half hour later. 
+    
+    """
+    
+    df = df_in.copy()
+    # Determine number of intervals in one day
+    if interval_type == 'days':    
+        interval_size = len(df['TIME'].unique())
+    elif interval_type == 'halfhours':
+        interval_size = 1
+    else:
+        print("Unknown interval length, please input 'days' or 'halfhours'.")
+        return None
+
+    # Number each interval
+    interval_to_num = {interval: i for i, interval in enumerate(df['TIME'].unique())}
+
+    # Map numbers to intervals, and calculate interval distance to end of day
+    df['TIME_num'] = df['TIME'].map(interval_to_num)
+    df['EOD_diff'] = interval_size - 1 - df['TIME_num']
+
+    # Get the total difference in rows between the data until which cumulative return is calculated and current date
+
+    if EOD_dummy:
+        df['TIME_diff'] = df['EOD_diff'] + interval_size*count
+        for index, row in df.iterrows():
+            df.at[index, f'future_price_{count}{interval_type}_EOD'] = df['PRICE'].shift(-row['TIME_diff']).loc[index]
+
+        df[f'future_ret_{count}{interval_type}_EOD'] = df[f'future_price_{count}{interval_type}_EOD'] / df['PRICE'] -1
+
+        if start_lead != 0:
+            df[f'future_ret_{count}{interval_type}_EOD_lead{start_lead}'] = df[f'future_ret_{count}{interval_type}_EOD'].shift(-start_lead)
+
+        df = df.drop(columns=[f'future_price_{count}{interval_type}_EOD'])
+        
+    else:
+        df['TIME_diff'] = interval_size * count
+        for index, row in df.iterrows():
+            df.at[index, f'future_price_{count}{interval_type}'] = df['PRICE'].shift(-row['TIME_diff']).loc[index]
+
+        df[f'future_ret_{count}{interval_type}'] = df[f'future_price_{count}{interval_type}'] / df['PRICE'] -1
+
+        if start_lead != 0:
+            df[f'future_ret_{count}{interval_type}_lead{start_lead}'] = df[f'future_ret_{count}{interval_type}'].shift(-start_lead)
+        
+        df = df.drop(columns=[f'future_price_{count}{interval_type}'])
+    
+    df = df.drop(columns=['TIME_num', 'EOD_diff', 'TIME_diff'])
+
+    return df

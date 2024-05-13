@@ -41,17 +41,30 @@ df_events = pd.read_excel(
 )
 
 
-# %% Load data as per 10-05-2024
+# %% Load data with most variables in there
 
+# Data per 10-05-2024
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240510.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_halfhourly = pickle.load(f)
 
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_daily = pickle.load(f)
+
+# Data per 13-05-2024
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240510.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240513.pkl",
     "rb",
 ) as f:
     etf_sel_halfhourly = pickle.load(f)
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240513.pkl",
     "rb",
 ) as f:
     etf_sel_daily = pickle.load(f)
@@ -360,7 +373,7 @@ for key in etf_sel_halfhourly.keys():
 
 for key in etf_sel_halfhourly.keys():
 
-    X = etf_sel_halfhourly[key]["Short_scaled"].values
+    X = etf_sel_halfhourly[key]["vol_index"].values
     result = adfuller(X)
     print(f"ADF Statistic {key}: %f" % result[0])
     print(f"p-value {key}: %f" % result[1])
@@ -398,6 +411,20 @@ for abbr in abbr_list:
     num_events = (event_count > 0).sum()
     print(f"{abbr}: {num_events}")
 
+# %% Add percentage price nav ratio
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+
+    price_16_df = df[df['TIME'] == '16:00:00'][['DATE', 'PRICE']]
+
+    merged = pd.merge(df, price_16_df, on='DATE', suffixes=('', '_16'))
+
+    merged['PRICE/NAV_pct'] = ((merged['PRICE_16'] - merged['NAV'])/merged['NAV']) * 100
+    merged = merged.drop(columns=['PRICE_16'])
+    etf_sel_halfhourly[key] = merged
+# Add lags
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_lag(etf_sel_halfhourly[key], 'PRICE/NAV_pct', 14)
 # %% # Get barplots for average intraday short volume for event- and non-event days
 
 # In the sample, no two selected events happen on the same day, so a zero in any of the event columns coincides with a zero in 'EVENT'
@@ -609,10 +636,11 @@ test_fig.show()
 
 # %%
 for key in etf_sel_halfhourly.keys():
-    mean = etf_sel_halfhourly[key]["PRICE/NAV"].mean()
-    stdev = etf_sel_halfhourly[key]["PRICE/NAV"].std()
-    min = etf_sel_halfhourly[key]["PRICE/NAV"].min()
-    max = etf_sel_halfhourly[key]["PRICE/NAV"].max()
+    mean = etf_sel_halfhourly[key]["abn_short_scaled"].mean()
+
+    stdev = etf_sel_halfhourly[key]["abn_short_scaled"].std()
+    min = etf_sel_halfhourly[key]["abn_short_scaled"].min()
+    max = etf_sel_halfhourly[key]["abn_short_scaled"].max()
     print(
         f"Stats for {key}:\n"
         f"            mean: {mean}\n"
@@ -626,23 +654,9 @@ for key in etf_sel_halfhourly.keys():
 ## Specify parameters for the plotting function
 ticker = "LQD"
 
-def get_extreme_values(df_in, column_name, percentile):
 
 
-    # number of observations related to percentile
-    n = int(len(df_in) * (percentile / 100))
-
-    highest_indices = df_in[column_name].abs().nlargest(n).index
-    highest_dates = df_in.loc[highest_indices, 'DT']
-    highest_values = df_in[column_name].abs().nlargest(n).values
-    
-
-    # lowest_indices = df_in[column_name].nsmallest(n).index
-    # lowest_values = df_in[column_name].nsmallest(n).values
-
-    return highest_dates.tolist(), highest_values.tolist()
-
-results = get_extreme_values(etf_sel_halfhourly[ticker], 'abn_short_scaled', 0.02)
+results = get_extreme_values(etf_sel_halfhourly[ticker], 'abn_short_scaled', 0.02, 'highest')
 event_date_list = [timestamp.strftime('%Y-%m-%d %H:%M:%S') for timestamp in results[0]]
 # List of event dates to be evaluated
 event_dt_list = event_date_list
@@ -814,17 +828,24 @@ for key in etf_sel_halfhourly.keys():
 # %% Do regressions
 
 # Specify regression parameters
-dep_vars = "Short_scaled_exp"
 
+# dep_vars = "Short_scaled_exp"
+dep_vars = "future_ret_5days_EOD"
+
+# indep_vars = [
+#     "Volume_scaled_exp",
+#     "cum_ret_scaled_exp",
+#     "PRICE/NAV_pct_lag14",
+#     "prev_day_rv_Average_5day_scaled_exp",
+#     "vol_index",
+# ]
 indep_vars = [
-    "Volume_scaled_exp",
-    "cum_ret_scaled_exp",
-    "PRICE/NAV_lag14_scaled_exp",
-    "prev_day_rv_Average_5day_scaled_exp",
+    'abn_short_scaled',
+    "future_ret_5days_EOD"
 ]
 
-for interval in intervals:
-    indep_vars.append(f"d_{interval}")
+# for interval in intervals:
+#     indep_vars.append(f"d_{interval}")
 
 # for interval in intervals:
 #     for event in ['ISM', 'FOMC']:
@@ -884,6 +905,77 @@ for key in etf_sel_halfhourly.keys():
     print(f'{key}: # times above threshold {threshold}: {count}')
 
 
+
+
+#%% Load in MOVE and VIX data
+
+move_df = pd.read_csv(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\MOVE_data.csv")
+vix_df = pd.read_excel(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Other data\VIX_data.xlsx")
+
+# Drop irrelevant rows
+vix_df = vix_df.drop(vix_df.index[:10]).reset_index(drop=True)
+
+# Drop irrelevant columns
+move_df = move_df.drop(columns=['Open', 'High', 'Low', 'Close', 'Volume'])
+
+# Drop NaNs
+vix_df = vix_df.dropna()
+# Rename columns
+vix_df = vix_df.rename(columns={'FRED Graph Observations': 'DATE', 'Unnamed: 1' : 'vol_index'})
+move_df = move_df.rename(columns={'Date' : 'DATE', 'Adj Close': 'vol_index'})
+
+# # Get dates in proper format
+move_df['DATE'] = pd.to_datetime(move_df['DATE'], format='%d/%m/%Y')
+move_df['DATE'] = move_df['DATE'].dt.strftime('%Y-%m-%d')
+vix_df['DATE'] = pd.to_datetime(vix_df['DATE'], format='%d/%m/%Y')
+vix_df['DATE'] = vix_df['DATE'].dt.strftime('%Y-%m-%d')
+
+# %% Merge move and VIX data into general dataframe
+
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+    df_move = move_df.copy()
+    df_vix = vix_df.copy()
+
+    if key in ['SPY', 'HYG']:
+        merged = pd.merge(
+            df,
+            df_vix,
+            on='DATE',
+            suffixes=("", "vol_index")
+        )
+    else:
+        merged = pd.merge(
+            df,
+            df_move,
+            on='DATE',
+            suffixes=("", "vol_index")
+        )
+    
+    merged['vol_index'] = merged['vol_index'].fillna(method='ffill')
+    etf_sel_halfhourly[key] = merged
+    
+
+# #%%
+# ## Save to pickle files
+# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240513.pkl", "wb") as f:
+#     pickle.dump(etf_sel_halfhourly, f)
+
+# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240513.pkl", "wb") as f:
+#     pickle.dump(etf_sel_daily, f)
+# %%
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days', True)
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days', True)
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days', True)
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days', True)
+
+#%%
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days')
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days')
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days')
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days')
 
 
 
