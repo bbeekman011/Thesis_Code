@@ -21,27 +21,27 @@ from statsmodels.tsa.stattools import adfuller
 # %% ## Load data pre-processed through Data file (no additional analysis or variables present)
 
 
-# Load data with intervals on the rows
-with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl",
-    "rb",
-) as f:
-    etf_merged_30min_daily_dict = pickle.load(f)
+# # Load data with intervals on the rows
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_daily_dict.pkl",
+#     "rb",
+# ) as f:
+#     etf_merged_30min_daily_dict = pickle.load(f)
 
-# Load data with intervals in the columns
-with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_halfhourly_dict.pkl",
-    "rb",
-) as f:
-    etf_merged_30min_halfhourly_dict = pickle.load(f)
+# # Load data with intervals in the columns
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\etf_merged_30min_halfhourly_dict.pkl",
+#     "rb",
+# ) as f:
+#     etf_merged_30min_halfhourly_dict = pickle.load(f)
 
-# Load event data
-df_events = pd.read_excel(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Relevant_event_data.xlsx"
-)
+# # Load event data
+# df_events = pd.read_excel(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Relevant_event_data.xlsx"
+# )
 
 
-# %% Load data with most variables in there
+#Load data with most variables in there
 
 # Data per 10-05-2024
 # with open(
@@ -56,20 +56,44 @@ df_events = pd.read_excel(
 # ) as f:
 #     etf_sel_daily = pickle.load(f)
 
-# Data per 13-05-2024
+# # Data per 13-05-2024
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240513.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_halfhourly = pickle.load(f)
+
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240513.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_daily = pickle.load(f)
+
+# # Data per 14-05-2024, including different future cumulative return specifications
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240514.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_halfhourly = pickle.load(f)
+
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240514.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_daily = pickle.load(f)
+
+# Data per 15-05-2024, including different future cumulative return specifications
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240513.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240515.pkl",
     "rb",
 ) as f:
     etf_sel_halfhourly = pickle.load(f)
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240513.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240515.pkl",
     "rb",
 ) as f:
     etf_sel_daily = pickle.load(f)
-
-
 #%% # Make selection of ETFs to investigate
 
 included_etfs = ["AGG", "HYG", "IEF", "LQD", "SPY", "SHY", "TLT"]
@@ -609,8 +633,8 @@ plt.show()
 
 ticker = "AGG"
 df = etf_sel_halfhourly[ticker]
-start_date = "2015-01-16"
-end_date = "2015-01-16"
+start_date = "2014-01-01"
+end_date = "2022-12-31"
 title = ticker
 y_1 = "abn_short_scaled"
 y_2 = "PRICE"
@@ -829,8 +853,10 @@ for key in etf_sel_halfhourly.keys():
 
 # Specify regression parameters
 
+
 # dep_vars = "Short_scaled_exp"
-dep_vars = "future_ret_5days_EOD"
+# dep_vars = ['future_ret_1halfhours']
+dep_vars = ['future_ret_1halfhours', 'future_ret_5days_EOD']
 
 # indep_vars = [
 #     "Volume_scaled_exp",
@@ -840,8 +866,27 @@ dep_vars = "future_ret_5days_EOD"
 #     "vol_index",
 # ]
 indep_vars = [
-    'abn_short_scaled',
-    "future_ret_5days_EOD"
+    '1percentile_pos_dummy',
+    '1percentile_neg_dummy',
+
+    # '0.5percentile_pos_dummy',
+    # '0.5percentile_neg_dummy',
+    # '0.25percentile_pos_dummy',
+    # '0.25percentile_neg_dummy',
+    # '0.1percentile_pos_dummy',
+    # '0.1percentile_neg_dummy',
+    # '2.5percentile_pos_dummy',
+    # '2.5percentile_neg_dummy',
+    # "Volume_scaled_exp",
+    # "cum_ret_scaled_exp",
+    # "PRICE/NAV_pct_lag14",
+    # "prev_day_rv_Average_5day_scaled_exp",
+    # "vol_index",
+
+
+
+
+    # '0.25percentile_abs_dummy'
 ]
 
 # for interval in intervals:
@@ -871,6 +916,37 @@ ticker = None
 
 show_reg_results(regression_result_dict, ticker)
 
+
+
+
+
+
+#%%
+# '1percentile_pos_dummy',
+    # '1percentile_neg_dummy',
+    # '0.5percentile_pos_dummy',
+    # '0.5percentile_neg_dummy',
+    # '0.25percentile_pos_dummy',
+    # '0.25percentile_neg_dummy',
+    # '0.1percentile_pos_dummy',
+    # '0.1percentile_neg_dummy',
+    # '2.5percentile_pos_dummy',
+    # '2.5percentile_neg_dummy',
+
+variable_name = '0.5percentile_pos_dummy'
+label = convert_variable_label(variable_name)
+
+print(label)
+
+
+#%%
+
+
+#%% test
+
+# dep_vars = ['future_ret_20days_EOD', 'future_ret_10days_EOD', 'future_ret_5days_EOD']
+latex_table = get_latex_table_stacked(regression_result_dict, dep_vars, indep_vars)
+print(latex_table)
 #%%
 for key in etf_sel_halfhourly.keys():
     df = etf_sel_halfhourly[key].copy()
@@ -891,18 +967,27 @@ print(latex_table)
 
 
 # %%
-threshold = 10
+# threshold = 10
+threshold_dict = {
+    "AGG": 1.25,
+    "HYG": 3,
+    "IEF": 3,
+    "LQD": 4,
+    "SPY": 1.25,
+    "SHY": 3,
+    "TLT": 2.5,
+}
 
 abn_date_dict = {}
 for key in etf_sel_halfhourly.keys():
     df = etf_sel_halfhourly[key].copy()
-    filter_df = df[abs(df['abn_short_scaled']) > threshold]
+    filter_df = df[abs(df['abn_short_scaled']) > threshold_dict[key]]
 
     count = filter_df.shape[0]
     indices = filter_df.index.tolist()
     dates = df.loc[indices, 'DT']
     abn_date_dict[key] = dates
-    print(f'{key}: # times above threshold {threshold}: {count}')
+    print(f'{key}: # times above threshold {threshold_dict[key]}: {count}')
 
 
 
@@ -956,29 +1041,95 @@ for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key] = merged
     
 
-# #%%
-# ## Save to pickle files
-# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240513.pkl", "wb") as f:
-#     pickle.dump(etf_sel_halfhourly, f)
+#%% Save to pickle files
 
-# with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240513.pkl", "wb") as f:
-#     pickle.dump(etf_sel_daily, f)
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240515.pkl", "wb") as f:
+    pickle.dump(etf_sel_halfhourly, f)
+
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240515.pkl", "wb") as f:
+    pickle.dump(etf_sel_daily, f)
+# %% Add future cumulative returns
+for key in etf_sel_halfhourly.keys():
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days', True)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days', True)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days', True)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days', True)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'halfhours', True)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'halfhours')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 2, 'halfhours')
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'halfhours', True, 1)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'halfhours', False, 1)
+    # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 2, 'halfhours', False, 1)
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 10, 'days', True)
+    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 20, 'days', True)
+
+
+
+
+
+
+# %%
+
+
+
+#%% Get dummies for large spikes in abnormal short volume
+
+threshold_dict = {
+    "AGG": 4,
+    "HYG": 3,
+    "IEF": 3,
+    "LQD": 4,
+    "SPY": 1.25,
+    "SHY": 3,
+    "TLT": 2.5,
+}
+
+for key in etf_sel_halfhourly.keys():
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1, 'abn_short_scaled', True, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1, 'abn_short_scaled', True, 'pos')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1, 'abn_short_scaled', True, 'neg')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.5, 'abn_short_scaled', True, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.5, 'abn_short_scaled', True, 'pos')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.5, 'abn_short_scaled', True, 'neg')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.1, 'abn_short_scaled', True, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.1, 'abn_short_scaled', True, 'pos')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.1, 'abn_short_scaled', True, 'neg')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.25, 'abn_short_scaled', True, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.25, 'abn_short_scaled', True, 'pos')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.25, 'abn_short_scaled', True, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 4, 'abn_short_scaled', False, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 4, 'abn_short_scaled', False, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 4, 'abn_short_scaled', False, 'abs')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 3, 'abn_short_scaled', False, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 3, 'abn_short_scaled', False, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 3, 'abn_short_scaled', False, 'abs')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', False, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', False, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', False, 'abs')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1.25, 'abn_short_scaled', False, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1.25, 'abn_short_scaled', False, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 1.25, 'abn_short_scaled', False, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.05, 'abn_short_scaled', True, 'abs')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.05, 'abn_short_scaled', True, 'pos')
+    # etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 0.05, 'abn_short_scaled', True, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', True, 'abs')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', True, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 2.5, 'abn_short_scaled', True, 'neg')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 5, 'abn_short_scaled', True, 'abs')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 5, 'abn_short_scaled', True, 'pos')
+    etf_sel_halfhourly[key] = create_peak_dummies(etf_sel_halfhourly[key], 5, 'abn_short_scaled', True, 'neg')
+
+        
+
+
+    
 # %%
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days', True)
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days', True)
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days', True)
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days', True)
-
-#%%
-for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, 'days')
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 1, 'days')
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 3, 'days')
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 5, 'days')
-
-
-
-
-
-
+    plt.figure()
+    plt.hist(etf_sel_halfhourly[key]['abn_short_scaled'], bins=100)
+    plt.title(f'Histogram of abnormal short volume - {key}')
+    plt.show

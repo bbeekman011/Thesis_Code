@@ -1174,19 +1174,22 @@ def create_grid_barplots(plot_title, dict_in, tickers, metrics, events, start_da
 
 def do_regression(df_in, indep_vars, dep_vars, cov_type):
     import statsmodels.api as sm
-
+    results_dict = {}
     df = df_in.copy()
 
-    df.dropna(subset=indep_vars+[dep_vars], inplace=True)
-    x = df[indep_vars]
-    y = df[dep_vars]
+    for dep_var in dep_vars:
 
-    x = sm.add_constant(x)
+        df.dropna(subset=indep_vars+[dep_var], inplace=True)
+        x = df[indep_vars]
+        y = df[dep_var]
 
-    model =sm.OLS(y, x)
-    results = model.fit(cov_type=cov_type)
+        x = sm.add_constant(x)
 
-    return results
+        model =sm.OLS(y, x)
+
+        results_dict[dep_var] = model.fit(cov_type=cov_type)
+
+    return results_dict
 
 
 
@@ -1235,11 +1238,15 @@ def get_latex_table(result_dict, dep_vars, indep_vars):
 def show_reg_results(result_dict, ticker=None):
     if ticker is None:
         for ticker in result_dict.keys():
-            summary = result_dict[ticker].summary()
-            print(f'Regression results for {ticker}: {summary}')
+            for var in result_dict[ticker].keys():
+
+                summary = result_dict[ticker][var].summary()
+                print(f'Regression results for dependent variable {var} and {ticker}: {summary}')
     else:
-        summary = result_dict[ticker].summary()
-        print(f'Regression results for {ticker}: {summary}')
+        for var in result_dict[ticker].keys():
+
+            summary = result_dict[ticker][var].summary()
+            print(f'Regression results for dependent variable {var} and {ticker}: {summary}')
 
 def add_lag(df_in, var, lag_num):
     df = df_in.copy()
@@ -1303,19 +1310,25 @@ def get_extreme_values(df_in, column_name, percentile, direction):
 
     # number of observations related to percentile
     n = int(len(df_in) * (percentile / 100))
-    if direction == "highest":
+    if direction == "pos":
+        indices = df_in[column_name].nlargest(n).index
+        dates = df_in.loc[indices, 'DT']
+        values = df_in[column_name].nlargest(n).values
+        return dates.tolist(), values.tolist()
+    
+    elif direction == "neg":
+        indices = df_in[column_name].nsmallest(n).index
+        dates = df_in.loc[indices, 'DT']
+        values = df_in[column_name].nsmallest(n).values
+        return dates.tolist(), values.tolist()
+    
+    elif direction == "abs":
         indices = df_in[column_name].abs().nlargest(n).index
         dates = df_in.loc[indices, 'DT']
         values = df_in[column_name].abs().nlargest(n).values
         return dates.tolist(), values.tolist()
-    
-    elif direction == "lowest":
-        indices = df_in[column_name].abs().nsmallest(n).index
-        dates = df_in.loc[indices, 'DT']
-        values = df_in[column_name].abs().nsmallest(n).values
-        return dates.tolist(), values.tolist()
     else:
-        print("Incorrect direction argument passed, please pass: 'highest' or 'lowest'.")
+        print("Incorrect direction argument passed, please pass:  pos, neg or abs.")
         return None
 
 
@@ -1373,3 +1386,171 @@ def add_future_ret(df_in, count, interval_type, EOD_dummy=False, start_lead=0):
     df = df.drop(columns=['TIME_num', 'EOD_diff', 'TIME_diff'])
 
     return df
+
+
+def create_peak_dummies(df_in, level, col_name, percentile=True, threshold_direction='abs'):
+    """
+    level: level of the threshold, refers to percentage point percentil if percentile is True, otherwise absolute level of the threshold
+    col_name: name of the column for which the dummy should be created
+    percentile: dummy variable determining type of threshold: percentile or absolute. Percentile returns dummy variables for the x% percentile, absolute returns
+    dummy variables for an absolute threshold level
+    abs: can take (abs, pos, neg), determines if spikes in absolute value, only positive or only negative spikes should be taken into account
+    """
+    def get_extreme_values(df_in, column_name, percentile, direction):
+
+
+        # number of observations related to percentile
+        n = int(len(df_in) * (percentile / 100))
+        if direction == "pos":
+            indices = df_in[column_name].nlargest(n).index
+            dates = df_in.loc[indices, 'DT']
+            values = df_in[column_name].nlargest(n).values
+            return dates.tolist(), values.tolist()
+        
+        elif direction == "neg":
+            indices = df_in[column_name].nsmallest(n).index
+            dates = df_in.loc[indices, 'DT']
+            values = df_in[column_name].nsmallest(n).values
+            return dates.tolist(), values.tolist()
+        
+        elif direction == "abs":
+            indices = df_in[column_name].abs().nlargest(n).index
+            dates = df_in.loc[indices, 'DT']
+            values = df_in[column_name].abs().nlargest(n).values
+            return dates.tolist(), values.tolist()
+        else:
+            print("Incorrect direction argument passed, please pass: 'highest' or 'lowest'.")
+            return None
+    
+    df = df_in.copy()
+
+    if percentile:
+        date_list, value_list = get_extreme_values(df, col_name, level, threshold_direction)
+        df[f'{level}percentile_{threshold_direction}_dummy'] = df['DT'].isin(date_list).astype(int)
+    
+    else:
+        if threshold_direction == 'abs':
+
+            df[f'{level}threshold_{threshold_direction}_dummy'] = (df[col_name].abs() > level).astype(int)
+        elif threshold_direction == 'pos':
+            df[f'{level}threshold_{threshold_direction}_dummy'] = (df[col_name] > level).astype(int)
+        
+        elif threshold_direction == 'neg':
+            df[f'{level}threshold_{threshold_direction}_dummy'] = (df[col_name] < -level).astype(int)
+    
+    return df
+
+
+
+
+
+
+
+def convert_variable_label(variable_name):
+    import re
+    label = ""
+
+    # Check if it's a future_ret variable
+    future_ret_match = re.match(r"future_ret_(\d+)([a-zA-Z_]*?)(?:_(\w+))?$", variable_name)
+    if future_ret_match:
+        num = int(future_ret_match.group(1))
+        time_unit = future_ret_match.group(2)
+        eod = future_ret_match.group(3)
+
+        if time_unit == "days":
+            if eod == "EOD":
+                if num == 0:
+                    label = f"$R_{{t, 14}}$"
+                else: 
+                    label = f"$R_{{t+{num}, 14}}$" 
+            else:
+                if num == 0:
+                    label = f"R_{{t, k}}$"
+                else:
+                    label = f"$R_{{t+{num}, k}}$"
+            
+        elif time_unit == "halfhours":
+            if eod == "EOD":
+                if num == 0:
+                    label = f"$R_{{t, 14}}$"
+                else:
+                    label = f"$R_{{t + {math.ceil(num / 14)}, {num % 14}}}$"
+            else:
+                if num == 0:
+                    label = f"$R_{{t, k}}$"
+                elif num < 14:
+                    label = f"$R_{{t, k + {num % 14}}}$"
+                else:
+                    if (num % 14) == 0:
+                        label = f"$R_{{t + {math.ceil(num / 14) - 1}, k}}$"
+                    else:
+                        label = f"$R_{{t + {math.ceil(num / 14) - 1}, k + {num % 14}}}$"
+
+                
+    else:
+        # Check if it's a percentile_pos or percentile_neg variable
+        percentile_match = re.match(r"(\d*\.?\d+)percentile_(pos|neg)_dummy", variable_name)
+        if percentile_match:
+            percentile = percentile_match.group(1)
+            sign = "+" if percentile_match.group(2) == "pos" else "-"
+            label = f"$\\beta_{{\\mathds{{1}}^{{{sign}}}_{{P_{{{percentile}}}}}}}$"
+    
+    return label
+
+
+
+
+def get_latex_table_stacked(result_dict, dep_vars, indep_vars):
+    import pandas as pd
+
+    all_rows = []
+
+    for dep_var in dep_vars:
+        dep_var_label = convert_variable_label(dep_var)
+
+        # Add dependent variable name to the top left
+        all_rows.append(f'\\multicolumn{{{len(result_dict) + 1}}}{{l}}{{{dep_var_label}}} \\\\ \\hline')
+
+        headers = [''] + list(result_dict.keys())
+        all_rows.append(' & '.join(headers) + ' \\\\ \\hline')
+
+        for var in indep_vars:
+            coef_values = []
+            t_stat_values = []
+
+            for ticker, ticker_results in result_dict.items():
+                results = ticker_results.get(dep_var, None)
+                if results is not None:
+                    coef = results.params[var]
+                    t_stats = results.tvalues[var]
+                    p_value = results.pvalues[var]
+                    if p_value < 0.01:
+                        significance = "***"
+                    elif 0.01 <= p_value < 0.05:
+                        significance = "**"
+                    elif 0.05 <= p_value < 0.1:
+                        significance = "*"
+                    else:
+                        significance = ""
+                    coef_values.append(f"{coef:.4f}{significance}")
+                    t_stat_values.append(f"({t_stats:.4f})")
+                else:
+                    coef_values.append("")
+                    t_stat_values.append("")
+
+            # Add coefficients row
+            row_values = [convert_variable_label(var)] + coef_values
+            all_rows.append(' & '.join(row_values) + ' \\\\')
+
+            # Add t-statistics row
+            row_values = [""] + t_stat_values
+            all_rows.append(' & '.join(row_values) + ' \\\\')
+        
+        # Add an empty line between panels
+        all_rows.append("\\hline \n \\multicolumn{" + str(len(result_dict) + 1) + "}{l}{} \\\\")
+
+    latex_table = "\n".join(all_rows)
+    caption = f"This table shows regression results of future cumulative returns from $R_{{t, k}}$ for different window lengths on dummy variables indicating whether abnormal short volume at time t, interval k breaches the interval $P_{{i}}$. *, ** and *** indicate significance at the 10\%, 5\% and 1\% level respectively, t-statistics are indicated below the coefficients."
+    latex_table = f"\\begin{{table}}[H]\n\\centering\n\\caption{{{caption}}}\n\\begin{{tabular}}{{l{'c' * len(result_dict.keys())}}}\n\\hline\n{latex_table}\n\\end{{tabular}}\n\\end{{table}}"
+    
+    return latex_table
