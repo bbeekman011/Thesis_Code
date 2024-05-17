@@ -1202,9 +1202,7 @@ def get_latex_table(result_dict, dep_vars, indep_vars):
 
     result_df = pd.DataFrame(index = result_dict.keys(), columns= indep_vars + ['R-squared'])
     for name in result_dict.keys():
-        results = result_dict[name]
-        
-
+        results = result_dict[name][dep_vars[0]]
         for var in indep_vars:
             coef = results.params[var]
             t_stats = results.tvalues[var]
@@ -1448,7 +1446,20 @@ def create_peak_dummies(df_in, level, col_name, percentile=True, threshold_direc
 
 def convert_variable_label(variable_name):
     import re
+    import math
+
+    label_dict = {
+     "PRICE/NAV_pct_lag14" : r"$\beta^{PRICE/NAV \%}_{t-1}$",
+     "cum_ret_scaled_exp" : r"$\beta^{cum\_return}_{t, 1\text{ \textit{to} }k-1}$",
+     "vol_index" : r"$\beta^{VIX/MOVE}_{t-1}$",
+     "prev_day_rv_Average_5day_scaled_exp" : r"$\beta^{\Bar{RV}_5day}_{t-1}$",
+     "Volume_scaled_exp" : r"$\beta^{Volume}_{t, k}$",
+    }
     label = ""
+    if variable_name in label_dict.keys():
+        label = label_dict[variable_name]
+
+    
 
     # Check if it's a future_ret variable
     future_ret_match = re.match(r"future_ret_(\d+)([a-zA-Z_]*?)(?:_(\w+))?$", variable_name)
@@ -1494,13 +1505,14 @@ def convert_variable_label(variable_name):
             percentile = percentile_match.group(1)
             sign = "+" if percentile_match.group(2) == "pos" else "-"
             label = f"$\\beta_{{\\mathds{{1}}^{{{sign}}}_{{P_{{{percentile}}}}}}}$"
+        
     
     return label
 
 
 
 
-def get_latex_table_stacked(result_dict, dep_vars, indep_vars):
+def get_latex_table_stacked(result_dict, dep_vars, indep_vars, include_r_squared):
     import pandas as pd
 
     all_rows = []
@@ -1546,8 +1558,15 @@ def get_latex_table_stacked(result_dict, dep_vars, indep_vars):
             row_values = [""] + t_stat_values
             all_rows.append(' & '.join(row_values) + ' \\\\')
         
+        # Add R-squared values if necessary
+        if include_r_squared:
+            rsquared_values = [f'{result_dict[ticker].get(dep_var, "").rsquared:.4f}' for ticker in result_dict]
+            all_rows.append(f'$R^2$ & {" & ".join(rsquared_values)} \\\\')
+            
         # Add an empty line between panels
         all_rows.append("\\hline \n \\multicolumn{" + str(len(result_dict) + 1) + "}{l}{} \\\\")
+
+        
 
     latex_table = "\n".join(all_rows)
     caption = f"This table shows regression results of future cumulative returns from $R_{{t, k}}$ for different window lengths on dummy variables indicating whether abnormal short volume at time t, interval k breaches the interval $P_{{i}}$. *, ** and *** indicate significance at the 10\%, 5\% and 1\% level respectively, t-statistics are indicated below the coefficients."
