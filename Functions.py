@@ -1252,56 +1252,105 @@ def add_lag(df_in, var, lag_num):
 
     return df
 
-class WalkForwardTransformer():
-    
-    def __init__(self,transformer,n_roll,method='<t'):
+import pandas as pd
+from sklearn.base import BaseEstimator
+
+class WalkForwardTransformer:
+    def __init__(self, transformer: BaseEstimator, window_size: int, method: str = '<=t', interval_col: str = None, rolling: bool = False):
         self.transformer = transformer
         self.method = method
-        self.n_roll = n_roll
-        return 
-    
-    def generate_walkforward_chunks(self, X):
-        start_index = max(0, self.n_roll)  # Ensure at least n_roll observations are available
-        for i in range(start_index, len(X)):
-            yield X.iloc[:i+1]
-            
-    def transform(self, X: pd.DataFrame, verbose=0):
-        ix = X.index[self.n_roll:]
+        self.window_size = window_size
+        self.interval_col = interval_col
+        self.rolling = rolling
+
+    def generate_walkforward_chunks(self, X: pd.DataFrame):
+        if self.interval_col:
+            grouped = X.groupby(self.interval_col)
+
+            for name, group in grouped:
+                group = group.drop(columns=self.interval_col)
+                if self.rolling:
+                    start_index = max(0, self.window_size)
+                    for i in range(start_index, len(group)):
+                        yield group.iloc[i - self.window_size:i + 1], name
+                else:
+                    start_index = max(0, self.window_size)
+                    for i in range(start_index, len(group)):
+                        yield group.iloc[:i + 1], name
+        else:
+            if self.rolling:
+                start_index = max(0, self.window_size)
+                for i in range(start_index, len(X)):
+                    yield X.iloc[i - self.window_size:i + 1], None
+            else:
+                start_index = max(0, self.window_size)
+                for i in range(start_index, len(X)):
+                    yield X.iloc[:i + 1], None
+
+
+    def transform(self, X: pd.DataFrame, verbose: int = 0):
+        if self.interval_col:
+            ix = X.groupby(self.interval_col).apply(lambda df: df.index[self.window_size:]).explode()
+            # Ensure ix is a Series before attempting to drop levels
+            if isinstance(ix, pd.Series) and ix.index.nlevels > 1:
+                ix = ix.droplevel(0)
+        else:
+            ix = X.index[self.window_size:]
+
         Xgen = self.generate_walkforward_chunks(X)
         Z = []
-        for i,Xi in enumerate(Xgen): 
-            if self.method=='<t':
+
+        for i, (Xi, interval) in enumerate(Xgen):
+            if self.method == '<t':
                 self.transformer.fit(Xi.iloc[:-1])
-            elif self.method=='<=t':
+            elif self.method == '<=t':
                 self.transformer.fit(Xi)
-            else: 
+            else:
                 raise NotImplementedError(self.method)
+            
             Xil = Xi.iloc[[-1]]
-            Zil = self.transformer.transform(Xil)
+            # Reshape Xil to 2D array if it is a single row
+            Xil_reshaped = Xil.values.reshape(1, -1)
+            Zil = self.transformer.transform(Xil_reshaped)
             Z.append(Zil.tolist()[0])
-            if verbose==1: 
-                print('Progress: %0.2f%%'%((i+1)*100./(len(X)-self.n_roll)),end='\r')
-        Z = pd.DataFrame(Z,index=ix,columns=X.columns)
-        return Z 
+
+            if verbose == 1:
+                print('Progress: %0.2f%%' % ((i + 1) * 100. / (len(X) - self.window_size)), end='\r')
+
+        Z = pd.DataFrame(Z, index=ix, columns=[col for col in X.columns if col != self.interval_col])
+        return Z
 
 
-def scale_vars_exp_window(df_in, scale_vars, scaler, n_roll, method="<=t", inplace=False):
-    import pandas as pd
-    from sklearn.preprocessing import StandardScaler
-
+def scale_vars_exp_window(df_in: pd.DataFrame, scale_vars: list, scaler: BaseEstimator, window_size: int, method: str = "<=t", interval_col: str = None, inplace: bool = False, rolling: bool = False) -> pd.DataFrame:
     df = df_in.copy()
-    wft = WalkForwardTransformer(scaler,method=method,n_roll=n_roll)
+    wft = WalkForwardTransformer(scaler, window_size=window_size, method=method, interval_col=interval_col, rolling=rolling)
+    
+    if interval_col:
+        scale_vars += [interval_col]
+    
+    
     df_scaled = wft.transform(df[scale_vars], verbose=1)
+
+    if interval_col:
+        scale_vars.remove(interval_col)
+
+    if rolling:
+        col_string = 'rolling_window'
+    else:
+        col_string = 'expanding_window'
 
 
     if inplace:
-        df[scale_vars] = df_scaled[scale_vars]
+        df[scale_vars] = df_scaled
     else:
         for var in scale_vars:
-            df[f'{var}_scaled_exp'] = df_scaled[var]
+            if interval_col:
+                df[f'{var}_scaled_{col_string}_interval_{window_size}days'] = df_scaled[var]
+            else:
+                df[f'{var}_scaled_exp_{col_string}_{window_size}'] = df_scaled[var]
 
-            
     return df
+
 
 def get_extreme_values(df_in, column_name, percentile, direction):
 
@@ -1573,3 +1622,37 @@ def get_latex_table_stacked(result_dict, dep_vars, indep_vars, include_r_squared
     latex_table = f"\\begin{{table}}[H]\n\\centering\n\\caption{{{caption}}}\n\\begin{{tabular}}{{l{'c' * len(result_dict.keys())}}}\n\\hline\n{latex_table}\n\\end{{tabular}}\n\\end{{table}}"
     
     return latex_table
+
+def do_panel_regression(data_dict, dep_vars, indep_vars, entity_effects=False, time_effects=False, cov_type='robust'):
+    """
+    Function to do a panel regression, given an input dictionary containing dfs for different financial items (here ETFs)
+    Parameters:
+    data_dict: dictionary containing dataframes with data
+    dep_vars: list of one item containing the column name of the dependent variable
+    indep_vars: list of column names of indepdendent variables
+    entity_effects: boolean indicating if item fixed effects should be included in the panel regression
+    time_effects: boolean indicating if time fixed effects should be included in the panel regression
+    cov_type: string specifiying the covariance type that is used for the standard error calculation, can be of the following types
+    - 'unadjusted' - assume homoskedasticity
+    - 'robust' - use White's estimator for heteroskedasticity robustness
+    - 'clustered' - one- or two-way clustering, takes cluster_entity and cluster_time (or clusters, but needs specification)
+    - 'kernel' - Driscoll-Kraay HAC estimator , takes kernel , default is Bartletts kernel
+
+    Returns: fitted model
+    
+    """
+    import pandas as pd
+    from linearmodels import PanelOLS
+    # Combine dataframes from dictionary into one df, suitable for panel regression
+    combined_df = pd.concat([df.assign(ticker=ticker) for ticker, df in data_dict.items()])
+
+    # Set multi-index, to allow for panel regression
+    combined_df.set_index(['ticker', 'DT'], inplace=True)
+
+    y = combined_df[dep_vars]
+    x = combined_df[indep_vars]
+    model = PanelOLS(y, x, entity_effects=entity_effects, time_effects=time_effects)
+
+    results = model.fit(cov_type=cov_type)
+
+    return results

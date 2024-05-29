@@ -285,3 +285,57 @@ with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Da
 with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240510.pkl", "wb") as f:
     pickle.dump(etf_sel_daily, f)
 # %%
+
+########################################################################################################################################################################
+# Load buy-sell imbalance data
+df_buysell = pd.read_csv(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\ETF data\BuySell_Imbalance_data.csv")
+
+
+# %% Calculate buy-sell imbalance, daily buys - daily sells scaled by total volume following Diether et al. (2009)
+
+df_buysell['Buy_Sell_Imb'] = (df_buysell['BuyVol_LR'] - df_buysell['SellVol_LR']) / df_buysell['total_vol']
+
+#%% Split into dictionaries
+buy_sell_dict = split_df_on_symbol(df_buysell, 'symbol')
+
+#%%
+for key in buy_sell_dict.keys():
+    buy_sell_dict[key]['Buy_Sell_Imb_lag1'] = buy_sell_dict[key]['Buy_Sell_Imb'].shift(1)
+     
+
+#%% Load in most recent data
+# Data per 15-05-2024, including different future cumulative return specifications
+with open(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240515.pkl",
+    "rb",
+) as f:
+    etf_sel_halfhourly = pickle.load(f)
+
+with open(
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240515.pkl",
+    "rb",
+) as f:
+    etf_sel_daily = pickle.load(f)
+#%% Add to general dataframe
+for key in etf_sel_halfhourly.keys():
+    df = etf_sel_halfhourly[key].copy()
+    df_buysell = buy_sell_dict[key].copy()
+    df_buysell = df_buysell.drop(columns=['SYM_ROOT', 'BuyNumTrades_LR', 'SellNumTrades_LR',
+       'total_trade', 'BuyVol_LR', 'SellVol_LR', 'total_vol'])
+    merged = pd.merge(
+        df,
+        df_buysell,
+        on='DATE',
+        suffixes=("", "Buy_Sell_Imb"),
+    )
+    
+    
+    etf_sel_halfhourly[key] = merged
+# %% Save to pickle
+## Save to pickle files
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240527.pkl", "wb") as f:
+    pickle.dump(etf_sel_halfhourly, f)
+
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240527.pkl", "wb") as f:
+    pickle.dump(etf_sel_daily, f)
+# %%

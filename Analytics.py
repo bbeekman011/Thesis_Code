@@ -17,7 +17,11 @@ import os
 import math
 from sklearn.preprocessing import StandardScaler
 from statsmodels.tsa.stattools import adfuller
+import warnings
 
+# %%
+warnings.resetwarnings()
+warnings.simplefilter("ignore")
 # %% ## Load data pre-processed through Data file (no additional analysis or variables present)
 
 
@@ -82,19 +86,31 @@ from statsmodels.tsa.stattools import adfuller
 # ) as f:
 #     etf_sel_daily = pickle.load(f)
 
-# Data per 15-05-2024, including different future cumulative return specifications
+# # Data per 15-05-2024, including different future cumulative return specifications
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240515.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_halfhourly = pickle.load(f)
+
+# with open(
+#     r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240515.pkl",
+#     "rb",
+# ) as f:
+#     etf_sel_daily = pickle.load(f)
+
+# Data per 27-05-2024, including buy-sell imbalance data
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240515.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240527.pkl",
     "rb",
 ) as f:
     etf_sel_halfhourly = pickle.load(f)
 
 with open(
-    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240515.pkl",
+    r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240527.pkl",
     "rb",
 ) as f:
     etf_sel_daily = pickle.load(f)
-
 
 
 # %% # Define some dictionaries for mapping
@@ -363,41 +379,112 @@ for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key] = add_rolling_window_average_col(
         etf_sel_halfhourly[key], "prev_day_rv", 5, "DT"
     )
-# %% ## Add scaled Volume and Short
 
-vars_scale = [
-    # "Volume",
-    # "Short",
-    # "Volume_dollar",
-    # "Short_dollar",
-    # "RETURN",
-    # "cum_ret",
-    # "cum_ret_lag1",
-    # "PRICE/NAV",
-    # "PRICE/NAV_lag",
-    # "prev_day_rv",
-    # "prev_day_rv_Average_5day",
-    # "RETURN",
-    "Short_Ratio"
+# %% Add scaled variables
+
+vars_scale = ["Volume", "Short", "Short_Ratio"]
+
+# Scale only over intervals, moving window of 1 year (250 trading days)
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = scale_vars_exp_window(
+        etf_sel_halfhourly[key],
+        vars_scale,
+        StandardScaler(),
+        250,
+        method="<=t",
+        interval_col="TIME",
+        inplace=False,
+        rolling=True,
+    )
+
+# Scale over intervals, moving window of 3 months (60 trading days)
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = scale_vars_exp_window(
+        etf_sel_halfhourly[key],
+        vars_scale,
+        StandardScaler(),
+        60,
+        method="<=t",
+        interval_col="TIME",
+        inplace=False,
+        rolling=True,
+    )
+
+
+# Scale over intervals, moving window of 1 months (20 trading days)
+for key in etf_sel_halfhourly.keys():
+    etf_sel_halfhourly[key] = scale_vars_exp_window(
+        etf_sel_halfhourly[key],
+        vars_scale,
+        StandardScaler(),
+        20,
+        method="<=t",
+        interval_col="TIME",
+        inplace=False,
+        rolling=True,
+    )
+
+
+# %% Remove irrelevant variables
+col_to_drop = [
+    "Volume_scaled_exp",
+    "Short_scaled_exp",
+    "Volume_dollar_scaled_exp",
+    "Short_dollar_scaled_exp",
+    "RETURN_scaled_exp",
+    "cum_ret_scaled_exp",
+    "cum_ret_lag1_scaled_exp",
+    "prev_day_rv_scaled_exp",
+    "prev_day_rv_Average_5day_scaled_exp",
+    "PRICE/NAV",
+    "PRICE/NAV_lag14",
+    "PRICE/NAV_scaled_exp",
+    "PRICE/NAV_lag14_scaled_exp",
+    "vol_indexvol_index",
+    "abn_short_scaled",
+    "1percentile_abs_dummy",
+    "1percentile_pos_dummy",
+    "1percentile_neg_dummy",
+    "0.5percentile_abs_dummy",
+    "0.5percentile_pos_dummy",
+    "0.5percentile_neg_dummy",
+    "0.1percentile_abs_dummy",
+    "0.1percentile_pos_dummy",
+    "0.1percentile_neg_dummy",
+    "0.25percentile_abs_dummy",
+    "0.25percentile_pos_dummy",
+    "0.25percentile_neg_dummy",
+    "0.05percentile_abs_dummy",
+    "0.05percentile_pos_dummy",
+    "0.05percentile_neg_dummy",
+    "4threshold_neg_dummy",
+    "4threshold_pos_dummy",
+    "4threshold_abs_dummy",
+    "3threshold_neg_dummy",
+    "3threshold_pos_dummy",
+    "3threshold_abs_dummy",
+    "2.5threshold_neg_dummy",
+    "2.5threshold_pos_dummy",
+    "2.5threshold_abs_dummy",
+    "1.25threshold_neg_dummy",
+    "1.25threshold_pos_dummy",
+    "1.25threshold_abs_dummy",
+    "2.5percentile_abs_dummy",
+    "2.5percentile_pos_dummy",
+    "2.5percentile_neg_dummy",
+    "5percentile_abs_dummy",
+    "5percentile_pos_dummy",
+    "5percentile_neg_dummy",
 ]
-
 for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = scale_vars_exp_window(
-        etf_sel_halfhourly[key], vars_scale, StandardScaler(), 100
-    )
+    etf_sel_halfhourly[key] = etf_sel_halfhourly[key].drop(columns=col_to_drop)
 
-# %% Add scaled NAV ratios
-vars_scale = ["PRICE/NAV", "PRICE/NAV_lag14"]
 
-for key in etf_sel_halfhourly.keys():
-    etf_sel_halfhourly[key] = scale_vars_exp_window(
-        etf_sel_halfhourly[key], vars_scale, StandardScaler(), 100
-    )
 # %% ## Do augmented Dickey-Fuller
 
 for key in etf_sel_halfhourly.keys():
 
-    X = etf_sel_halfhourly[key]["vol_index"].values
+    X = etf_sel_halfhourly[key]["Short"].values
     result = adfuller(X)
     print(f"ADF Statistic {key}: %f" % result[0])
     print(f"p-value {key}: %f" % result[1])
@@ -848,66 +935,65 @@ for key in etf_sel_daily.keys():
     etf_sel_daily[key]["Volume_FDNLH"] = etf_sel_daily[key][col_list_ave].mean(axis=1)
 
 
-
 # %% #
 for key in etf_sel_halfhourly.keys():
     etf_sel_halfhourly[key]["RETURN_100"] = etf_sel_halfhourly[key]["RETURN"] * 100
 
-#%%
+# %%
 etf_sel_halfhourly_dict_stor = etf_sel_halfhourly.copy()
 # %% Do regressions
 
 # Specify regression parameters
 
 
-# dep_vars = ["Short_Ratio_scaled_exp"]
-dep_vars = [
-    'future_ret_1halfhours',
-    'future_ret_1days',
-    'future_ret_1days_EOD',
-            ]
+# dep_vars = ["Short_scaled_rolling_window_interval_250days"]
 # dep_vars = [
 #     "future_ret_1halfhours",
-#     "future_ret_2halfhours",
-#     "future_ret_0days_EOD",
-#     "future_ret_1halfhours_EOD",
 #     "future_ret_1days",
-
 #     "future_ret_1days_EOD",
-#     "future_ret_3days_EOD",
-#     "future_ret_5days_EOD",
-#     "future_ret_10days_EOD",
-#     "future_ret_20days_EOD",
 # ]
+dep_vars = [
+    "future_ret_1halfhours",
+    "future_ret_2halfhours",
+    "future_ret_0days_EOD",
+    "future_ret_1halfhours_EOD",
+    "future_ret_1days",
 
-# indep_vars = [
-#     "Short_Ratio_scaled_exp",
-# #     "Short_scaled_exp",
-# #     "Volume_scaled_exp",
-# #     "cum_ret_scaled_exp",
-# #     "PRICE/NAV_pct_lag14",
-# #     "prev_day_rv_Average_5day_scaled_exp",
-# #     "vol_index",
-# ]
+    "future_ret_1days_EOD",
+    "future_ret_3days_EOD",
+    "future_ret_5days_EOD",
+    "future_ret_10days_EOD",
+    "future_ret_20days_EOD",
+]
+
 indep_vars = [
-    # "1percentile_pos_dummy_abn_short",
-    # "1percentile_neg_dummy_abn_short",
-    '0.5percentile_pos_dummy',
-    '0.5percentile_neg_dummy',
-    # '0.25percentile_pos_dummy_abn_short',
-    # '0.25percentile_neg_dummy_abn_short',
-    # '0.1percentile_pos_dummy_abn_short',
-    # '0.1percentile_neg_dummy_abn_short',
-    # '2.5percentile_pos_dummy_abn_short',
-    # '2.5percentile_neg_dummy_abn_short',
-    # '0.05percentile_pos_dummy_abn_short',
-    # '0.05percentile_neg_dummy_abn_short',
-    # "Volume_scaled_exp",
-    # "cum_ret_scaled_exp",
+    # "Short_Ratio_scaled_rolling_window_interval_250days",
+    "Short_scaled_rolling_window_interval_250days",
+    # "Volume_scaled_rolling_window_interval_250days",
+    # "cum_ret",
     # "PRICE/NAV_pct_lag14",
-#     "prev_day_rv_Average_5day_scaled_exp",
+    # "prev_day_rv_Average_5day",
     # "vol_index",
 ]
+# indep_vars = [
+#     # "1percentile_pos_dummy_abn_short",
+#     # "1percentile_neg_dummy_abn_short",
+#     "0.5percentile_pos_dummy",
+#     "0.5percentile_neg_dummy",
+#     # '0.25percentile_pos_dummy_abn_short',
+#     # '0.25percentile_neg_dummy_abn_short',
+#     # '0.1percentile_pos_dummy_abn_short',
+#     # '0.1percentile_neg_dummy_abn_short',
+#     # '2.5percentile_pos_dummy_abn_short',
+#     # '2.5percentile_neg_dummy_abn_short',
+#     # '0.05percentile_pos_dummy_abn_short',
+#     # '0.05percentile_neg_dummy_abn_short',
+#     # "Volume_scaled_exp",
+#     # "cum_ret_scaled_exp",
+#     # "PRICE/NAV_pct_lag14",
+#     #     "prev_day_rv_Average_5day_scaled_exp",
+#     # "vol_index",
+# ]
 
 # for interval in intervals:
 #     indep_vars.append(f"d_{interval}")
@@ -922,13 +1008,13 @@ indep_vars = [
 # Specify error type
 cov_type = "HC1"
 ticker = None
-start_date = '2014-01-01'
-end_date = '2015-12-31'
+start_date = "2014-01-01"
+end_date = "2022-12-31"
 
-for key in etf_sel_halfhourly.keys():
-    df = etf_sel_halfhourly_dict_stor[key].copy()
-    df = df[(df['DATE'] >= start_date) & (df['DATE'] <= end_date)]
-    etf_sel_halfhourly[key] = df
+# for key in etf_sel_halfhourly.keys():
+#     df = etf_sel_halfhourly_dict_stor[key].copy()
+#     df = df[(df["DATE"] >= start_date) & (df["DATE"] <= end_date)]
+#     etf_sel_halfhourly[key] = df
 
 
 
@@ -949,12 +1035,13 @@ else:
 # Show results for regression results. Ticker is None prints all results
 
 
-
 show_reg_results(regression_result_dict, ticker)
 
-#%%
+# %%
 
-latex_table = get_latex_table_stacked(regression_result_dict, dep_vars, indep_vars, True)
+latex_table = get_latex_table_stacked(
+    regression_result_dict, dep_vars, indep_vars, True
+)
 # latex_table = get_latex_table(regression_result_dict, dep_vars, indep_vars)
 print(latex_table)
 # %%
@@ -973,25 +1060,27 @@ latex_table, result_df = get_latex_table(regression_result_dict, dep_vars, indep
 
 print(latex_table)
 
-#%%
+# %%
 dummy_list = [
     "1percentile_pos_dummy",
     "1percentile_neg_dummy",
-    '0.5percentile_pos_dummy',
-    '0.5percentile_neg_dummy',
-    '0.25percentile_pos_dummy',
-    '0.25percentile_neg_dummy',
-    '0.1percentile_pos_dummy',
-    '0.1percentile_neg_dummy',
-    '2.5percentile_pos_dummy',
-    '2.5percentile_neg_dummy',
-    '0.05percentile_pos_dummy',
-    '0.05percentile_neg_dummy',
+    "0.5percentile_pos_dummy",
+    "0.5percentile_neg_dummy",
+    "0.25percentile_pos_dummy",
+    "0.25percentile_neg_dummy",
+    "0.1percentile_pos_dummy",
+    "0.1percentile_neg_dummy",
+    "2.5percentile_pos_dummy",
+    "2.5percentile_neg_dummy",
+    "0.05percentile_pos_dummy",
+    "0.05percentile_neg_dummy",
 ]
 
 for key in etf_sel_halfhourly.keys():
     for dummy in dummy_list:
-        etf_sel_halfhourly[key][f'{dummy}_abn_short'] = etf_sel_halfhourly[key][dummy] * etf_sel_halfhourly[key]['abn_short_scaled']
+        etf_sel_halfhourly[key][f"{dummy}_abn_short"] = (
+            etf_sel_halfhourly[key][dummy] * etf_sel_halfhourly[key]["abn_short_scaled"]
+        )
 
 # %%
 # threshold = 10
@@ -1094,7 +1183,9 @@ for key in etf_sel_halfhourly.keys():
     # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 10, "days", True)
     # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 20, "days", True)
     # etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 0, "days", True, 1)
-    etf_sel_halfhourly[key] = add_future_ret(etf_sel_halfhourly[key], 2, "halfhours", True, 1)
+    etf_sel_halfhourly[key] = add_future_ret(
+        etf_sel_halfhourly[key], 2, "halfhours", True, 1
+    )
 
 # %%
 
@@ -1191,19 +1282,30 @@ for key in etf_sel_halfhourly.keys():
     plt.show
 
 
-
-#%%
+# %%
 
 percentile = 0.5
 for key in etf_sel_halfhourly.keys():
-    df = etf_sel_halfhourly[key].copy()        
+    df = etf_sel_halfhourly[key].copy()
     plt.figure(figsize=(10, 6))
 
-    plt.plot(df['DT'], df[f'{percentile}percentile_pos_dummy_abn_short'], label=f'{percentile}_percentile', marker='o', color='green')
-    plt.plot(df['DT'], df[f'{percentile}percentile_neg_dummy_abn_short'], label=f'{percentile}_percentile', marker='o', color='red')
-    plt.xlabel('Date')
-    plt.ylabel('Dummy x abnormal short')
-    plt.title(f'{key} - Spikes Over Time')
+    plt.plot(
+        df["DT"],
+        df[f"{percentile}percentile_pos_dummy_abn_short"],
+        label=f"{percentile}_percentile",
+        marker="o",
+        color="green",
+    )
+    plt.plot(
+        df["DT"],
+        df[f"{percentile}percentile_neg_dummy_abn_short"],
+        label=f"{percentile}_percentile",
+        marker="o",
+        color="red",
+    )
+    plt.xlabel("Date")
+    plt.ylabel("Dummy x abnormal short")
+    plt.title(f"{key} - Spikes Over Time")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -1213,31 +1315,31 @@ for key in etf_sel_halfhourly.keys():
 
 for key in etf_sel_halfhourly.keys():
     df = etf_sel_halfhourly[key].copy()
-    for year in df['YEAR'].unique():
-        num = df[df['YEAR'] == year]['Short_Ratio'].mean()
-        print(f'{key}: {year}: {num}')
+    for year in df["YEAR"].unique():
+        num = df[df["YEAR"] == year]["Short_Ratio"].mean()
+        print(f"{key}: {year}: {num}")
 # %% Plot average short ratio over time
 
 plt.figure(figsize=(10, 6))
 
 for ticker, df in etf_sel_halfhourly.items():
 
-    yearly_avg = df.groupby('YEAR')['Short_Ratio'].mean()
-    plt.plot(yearly_avg.index, yearly_avg.values, marker='o', label=ticker)
+    yearly_avg = df.groupby("YEAR")["Short_Ratio"].mean()
+    plt.plot(yearly_avg.index, yearly_avg.values, marker="o", label=ticker)
 
-plt.xlabel('Year')
-plt.ylabel('Average Short Ratio')
-plt.title('Average Short Ratio per year for the considered ETFs')
+plt.xlabel("Year")
+plt.ylabel("Average Short Ratio")
+plt.title("Average Short Ratio per year for the considered ETFs")
 plt.legend()
 
 plt.show()
 
-#%% Calculate hit rate of very short term strategies
+# %% Calculate hit rate of very short term strategies
 
-ret_col = 'future_ret_1halfhours'
+ret_col = "future_ret_1halfhours"
 for ticker, df in etf_sel_halfhourly.items():
 
-    df_dummy = df[df['5percentile_pos_dummy'] == 1]
+    df_dummy = df[df["5percentile_pos_dummy"] == 1]
     total_num = df.shape[0]
     total_num_dummy = df_dummy.shape[0]
     pos_returns = df[df[ret_col] > 0].shape[0]
@@ -1248,73 +1350,81 @@ for ticker, df in etf_sel_halfhourly.items():
     average_ret = df[ret_col].mean()
     average_ret_dummy = df_dummy[ret_col].mean()
 
-    print(f'Hit rate {ret_col} {ticker}: {hit_rate_dummy} (n={total_num_dummy}) total hit rate: {hit_rate}, diff: {hit_rate_dummy - hit_rate}')
+    print(
+        f"Hit rate {ret_col} {ticker}: {hit_rate_dummy} (n={total_num_dummy}) total hit rate: {hit_rate}, diff: {hit_rate_dummy - hit_rate}"
+    )
     # print(f'{ticker} average return: {average_ret_dummy}, average tot return: {average_ret}, diff: {average_ret_dummy-average_ret}')
 # %% Look at some aggregate daily stuff
 
 var = "Volume"
 
 intervals = [
-                f"{var}_9first",
-                f"{var}_FH",
-                f"{var}_10first",
-                f"{var}_10second",
-                f"{var}_11first",
-                f"{var}_11second",
-                f"{var}_12first",
-                f"{var}_12second",
-                f"{var}_13first",
-                f"{var}_13second",
-                f"{var}_14first",
-                f"{var}_14second",
-                f"{var}_SLH",
-                f"{var}_LH",
+    f"{var}_9first",
+    f"{var}_FH",
+    f"{var}_10first",
+    f"{var}_10second",
+    f"{var}_11first",
+    f"{var}_11second",
+    f"{var}_12first",
+    f"{var}_12second",
+    f"{var}_13first",
+    f"{var}_13second",
+    f"{var}_14first",
+    f"{var}_14second",
+    f"{var}_SLH",
+    f"{var}_LH",
 ]
 
 for key in etf_sel_daily.keys():
     etf_sel_daily[key][f"{var}_total"] = etf_sel_daily[key][intervals].sum(axis=1)
-#%%
-for key in etf_sel_daily.keys():
-    etf_sel_daily[key]['Short_Ratio_total'] =  etf_sel_daily[key]['Short_total'] /  etf_sel_daily[key]['Volume_total']
 # %%
 for key in etf_sel_daily.keys():
-    mean = etf_sel_daily[key]['Short_Ratio_total'].mean()
-    std = etf_sel_daily[key]['Short_Ratio_total'].std()
-    minimum =  etf_sel_daily[key]['Short_Ratio_total'].min()
-    maximum =  etf_sel_daily[key]['Short_Ratio_total'].max()
-    print(f'{key}:')
-    print(f'Mean: {mean}')
-    print(f'Stdev: {std}')
-    print(f'Minimum: {min}')
-    print(f'Maximum: {max}')
+    etf_sel_daily[key]["Short_Ratio_total"] = (
+        etf_sel_daily[key]["Short_total"] / etf_sel_daily[key]["Volume_total"]
+    )
+# %%
+for key in etf_sel_daily.keys():
+    mean = etf_sel_daily[key]["Short_Ratio_total"].mean()
+    std = etf_sel_daily[key]["Short_Ratio_total"].std()
+    minimum = etf_sel_daily[key]["Short_Ratio_total"].min()
+    maximum = etf_sel_daily[key]["Short_Ratio_total"].max()
+    print(f"{key}:")
+    print(f"Mean: {mean}")
+    print(f"Stdev: {std}")
+    print(f"Minimum: {min}")
+    print(f"Maximum: {max}")
 # %% Calculate cumulative daily returns
 var = "Return"
 
 intervals = [
-                f"{var}_09first",
-                f"{var}_FH",
-                f"{var}_10first",
-                f"{var}_10second",
-                f"{var}_11first",
-                f"{var}_11second",
-                f"{var}_12first",
-                f"{var}_12second",
-                f"{var}_13first",
-                f"{var}_13second",
-                f"{var}_14first",
-                f"{var}_14second",
-                f"{var}_SLH",
-                f"{var}_LH",
+    f"{var}_09first",
+    f"{var}_FH",
+    f"{var}_10first",
+    f"{var}_10second",
+    f"{var}_11first",
+    f"{var}_11second",
+    f"{var}_12first",
+    f"{var}_12second",
+    f"{var}_13first",
+    f"{var}_13second",
+    f"{var}_14first",
+    f"{var}_14second",
+    f"{var}_SLH",
+    f"{var}_LH",
 ]
 
 for key in etf_sel_daily.keys():
-    etf_sel_daily[key][f"{var}_total"] = etf_sel_daily[key][intervals].apply(lambda row: np.prod(1 + row) - 1, axis=1)
+    etf_sel_daily[key][f"{var}_total"] = etf_sel_daily[key][intervals].apply(
+        lambda row: np.prod(1 + row) - 1, axis=1
+    )
 
-#%% Add future returns
+# %% Add future returns
 
 lead = 20
 for key in etf_sel_daily.keys():
-    etf_sel_daily[key][f'Return_total_lead{lead}'] = etf_sel_daily[key]['Return_total'].shift(-lead)
+    etf_sel_daily[key][f"Return_total_lead{lead}"] = etf_sel_daily[key][
+        "Return_total"
+    ].shift(-lead)
 
 
 # %% Do regressions
@@ -1323,9 +1433,7 @@ for key in etf_sel_daily.keys():
 
 
 # dep_vars = ["Short_Ratio_scaled_exp"]
-dep_vars = [
-    "Cum_Ret_20days"
-            ]
+dep_vars = ["Cum_Ret_20days"]
 # dep_vars = [
 #     "future_ret_1halfhours",
 #     "future_ret_2halfhours",
@@ -1341,23 +1449,19 @@ dep_vars = [
 # ]
 
 
-indep_vars =  [
-  "20day_diff_short_ratio"
-]
-
+indep_vars = ["20day_diff_short_ratio"]
 
 
 # Specify error type
 cov_type = "HC1"
 ticker = None
-start_date = '2014-01-01'
-end_date = '2022-12-31'
+start_date = "2014-01-01"
+end_date = "2022-12-31"
 
 # for key in etf_sel_daily.keys():
 #     df = etf_sel_daily_dict_stor[key].copy()
 #     df = df[(df['DATE'] >= start_date) & (df['DATE'] <= end_date)]
 #     etf_sel_daily[key] = df
-
 
 
 # Perform regressions
@@ -1377,7 +1481,6 @@ else:
 # Show results for regression results. Ticker is None prints all results
 
 
-
 show_reg_results(regression_result_dict, ticker)
 
 # %%
@@ -1387,7 +1490,6 @@ num_days = 3
 for key in etf_sel_daily.keys():
 
     df = etf_sel_daily[key].copy()
-    
 
     cumulative_returns = []
     for i in range(len(df)):
@@ -1395,34 +1497,42 @@ for key in etf_sel_daily.keys():
         z = i + num_days + 1
         y = len(df)
         end_index = min(y, z)
-        for j in range(i+1, end_index):
-            cum_ret *= df.loc[j, 'Return_total'] + 1
+        for j in range(i + 1, end_index):
+            cum_ret *= df.loc[j, "Return_total"] + 1
         cum_ret -= 1
         cumulative_returns.append(cum_ret)
 
-
-    etf_sel_daily[key][f'Cum_Ret_{num_days}days'] = cumulative_returns
+    etf_sel_daily[key][f"Cum_Ret_{num_days}days"] = cumulative_returns
 # %% Get rolling window averages for short_ratio over past 1 week and past 1 month
 
 for key in etf_sel_daily.keys():
     df = etf_sel_daily[key].copy()
 
-    df.set_index('DATE', inplace=True)
+    df.set_index("DATE", inplace=True)
 
-    df['5day_average_short_ratio'] = df['Short_Ratio_total'].rolling(window=5).mean()
-    df['20day_average_short_ratio'] = df['Short_Ratio_total'].rolling(window=20).mean()
+    df["5day_average_short_ratio"] = df["Short_Ratio_total"].rolling(window=5).mean()
+    df["20day_average_short_ratio"] = df["Short_Ratio_total"].rolling(window=20).mean()
 
-    df['5day_diff_short_ratio'] = df['Short_Ratio_total'] - df['5day_average_short_ratio']
-    df['20day_diff_short_ratio'] = df['Short_Ratio_total'] - df['20day_average_short_ratio']
+    df["5day_diff_short_ratio"] = (
+        df["Short_Ratio_total"] - df["5day_average_short_ratio"]
+    )
+    df["20day_diff_short_ratio"] = (
+        df["Short_Ratio_total"] - df["20day_average_short_ratio"]
+    )
 
     df.reset_index(inplace=True)
 
-    etf_sel_daily[key]['5day_average_short_ratio'] = df['5day_average_short_ratio']
-    etf_sel_daily[key]['20day_average_short_ratio'] = df['20day_average_short_ratio']
-    etf_sel_daily[key]['5day_diff_short_ratio'] = df['5day_diff_short_ratio']
-    etf_sel_daily[key]['20day_diff_short_ratio'] = df['20day_diff_short_ratio']
+    etf_sel_daily[key]["5day_average_short_ratio"] = df["5day_average_short_ratio"]
+    etf_sel_daily[key]["20day_average_short_ratio"] = df["20day_average_short_ratio"]
+    etf_sel_daily[key]["5day_diff_short_ratio"] = df["5day_diff_short_ratio"]
+    etf_sel_daily[key]["20day_diff_short_ratio"] = df["20day_diff_short_ratio"]
 
 
-    
+# %% Save to pickle
+## Save to pickle files
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_halfhourly_20240527.pkl", "wb") as f:
+    pickle.dump(etf_sel_halfhourly, f)
 
+with open(r"C:\Users\ROB7831\OneDrive - Robeco Nederland B.V\Documents\Thesis\Data\Processed\etf_sel_daily_20240527.pkl", "wb") as f:
+    pickle.dump(etf_sel_daily, f)
 # %%
