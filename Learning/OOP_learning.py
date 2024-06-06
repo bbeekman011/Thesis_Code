@@ -28,12 +28,6 @@ item2 = Item("Laptop", 500, 3)
 item2.pay_rate = 0.7
 
 
-item1.apply_discount()
-print(item1.price)
-
-item2.apply_discount()
-print(item2.price)
-
 
 
 

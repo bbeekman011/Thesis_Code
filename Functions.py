@@ -1172,7 +1172,7 @@ def create_grid_barplots(plot_title, dict_in, tickers, metrics, events, start_da
 
 
 
-def do_regression(df_in, indep_vars, dep_vars, cov_type):
+def do_regression(df_in, indep_vars, dep_vars, cov_type, max_lag = 1):
     import statsmodels.api as sm
     results_dict = {}
     df = df_in.copy()
@@ -1186,8 +1186,10 @@ def do_regression(df_in, indep_vars, dep_vars, cov_type):
         x = sm.add_constant(x)
 
         model =sm.OLS(y, x)
-
-        results_dict[dep_var] = model.fit(cov_type=cov_type)
+        if cov_type == 'HAC':
+            results_dict[dep_var] = model.fit(cov_type=cov_type, cov_kwds={'maxlags': max_lag})
+        else:
+            results_dict[dep_var] = model.fit(cov_type=cov_type)
 
     return results_dict
 
@@ -1623,7 +1625,7 @@ def get_latex_table_stacked(result_dict, dep_vars, indep_vars, include_r_squared
     
     return latex_table
 
-def do_panel_regression(data_dict, dep_vars, indep_vars, entity_effects=False, time_effects=False, cov_type='robust'):
+def do_panel_regression(data_dict, dep_vars, indep_vars, entity_effects=False, time_effects=False, cov_type='robust', time=None):
     """
     Function to do a panel regression, given an input dictionary containing dfs for different financial items (here ETFs)
     Parameters:
@@ -1646,6 +1648,8 @@ def do_panel_regression(data_dict, dep_vars, indep_vars, entity_effects=False, t
     # Combine dataframes from dictionary into one df, suitable for panel regression
     combined_df = pd.concat([df.assign(ticker=ticker) for ticker, df in data_dict.items()])
 
+    if time:
+        combined_df = combined_df[combined_df['TIME'] == time]
     # Set multi-index, to allow for panel regression
     combined_df.set_index(['ticker', 'DT'], inplace=True)
 
@@ -1656,3 +1660,283 @@ def do_panel_regression(data_dict, dep_vars, indep_vars, entity_effects=False, t
     results = model.fit(cov_type=cov_type)
 
     return results
+
+
+def do_panel_regression_alt(df, dep_vars, indep_vars, entity_effects=False, time_effects=False, cov_type='robust'):
+    """
+    Function to do a panel regression, given an input dictionary containing dfs for different financial items (here ETFs)
+    Parameters:
+    data_dict: dictionary containing dataframes with data
+    dep_vars: list of one item containing the column name of the dependent variable
+    indep_vars: list of column names of indepdendent variables
+    entity_effects: boolean indicating if item fixed effects should be included in the panel regression
+    time_effects: boolean indicating if time fixed effects should be included in the panel regression
+    cov_type: string specifiying the covariance type that is used for the standard error calculation, can be of the following types
+    - 'unadjusted' - assume homoskedasticity
+    - 'robust' - use White's estimator for heteroskedasticity robustness
+    - 'clustered' - one- or two-way clustering, takes cluster_entity and cluster_time (or clusters, but needs specification)
+    - 'kernel' - Driscoll-Kraay HAC estimator , takes kernel , default is Bartletts kernel
+
+    Returns: fitted model
+    
+    """
+    import pandas as pd
+    from linearmodels import PanelOLS
+    # Combine dataframes from dictionary into one df, suitable for panel regression
+    combined_df = df.copy()
+    combined_df['TIME'] = pd.to_datetime(combined_df['TIME'])
+    # Set multi-index, to allow for panel regression
+    combined_df.set_index(['TIME', 'DT'], inplace=True)
+
+    y = combined_df[dep_vars]
+    x = combined_df[indep_vars]
+    model = PanelOLS(y, x, entity_effects=entity_effects, time_effects=time_effects)
+
+    results = model.fit(cov_type=cov_type)
+
+    return results
+
+
+def define_mappings():
+    # Define some dictionaries for mapping
+    etf_dict = {
+        "AGG": "iShares Core U.S. Aggregate Bond ETF",
+        "BND": "Vanguard Total Bond Market ETF",
+        "DIA": "SPDR Dow Jones Industrial Average ETF Trust",
+        "EEM": "iShares MSCI Emerging Markets ETF",
+        "EFA": "iShares MSCI EAFE ETF",
+        "FXI": "iShares China Large-Cap ETF",
+        "HYG": "iShares iBoxx $ High Yield Corporate Bond ETF",
+        "IEF": "iShares 7-10 Year Treasury Bond ETF",
+        "IWM": "iShares Russell 2000 ETF",
+        "IYR": "iShares U.S. Real Estate ETF",
+        "LQD": "iShares iBoxx $ Investment Grade Corporate Bond ETF",
+        "QQQ": "Invesco QQQ Trust Series I (Nasdaq)",
+        "SHY": "iShares 1-3 Year Treasury Bond ETF",
+        "SPY": "SPDR S&P 500 ETF Trust",
+        "TLT": "iShares 20+ Year Treasury Bond ETF",
+        "USHY": "iShares Broad USD High Yield Corporate Bond ETF",
+        "VCIT": "Vanguard Intermediate-Term Corporate Bond ETF",
+        "VCSH": "Vanguard Short-Term Corporate Bond ETF",
+        "VWO": "Vanguard FTSE Emerging Markets ETF",
+        "XLB": "Materials Select Sector SPDR Fund",
+        "XLC": "Communication Services Select Sector SPDR Fund",
+        "XLE": "Energy Select Sector SPDR Fund",
+        "XLF": "Financial Select Sector SPDR Fund",
+        "XLI": "Industrial Select Sector SPDR Fund",
+        "XLK": "Technology Select Sector SPDR Fund",
+        "XLP": "Consumer Staples Select Sector SPDR Fund",
+        "XLRE": "Real Estate Select Sector SPDR Fund",
+        "XLU": "Utilities Select Sector SPDR Fund",
+        "XLV": "Health Care Select Sector SPDR Fund",
+        "XLY": "Consumer Discretionary Select Sector SPDR Fund",
+    }
+
+    ## Dictionary linking event abbreviations to their relevant description in Bloomberg
+    event_dict = {
+        "ISM": "ISM Manufacturing",
+        "FOMC": "FOMC Rate Decision (Upper Bound)",
+        "NFP": "Change in Nonfarm Payrolls",
+        "CPI": "CPI YoY",
+        "GDP": "GDP Annualized QoQ",
+        "IP": "Industrial Production MoM",
+        "PI": "Personal Income",
+        "HST": "Housing Starts",
+        "PPI": "PPI Ex Food and Energy MoM",
+    }
+
+
+    ## List of column suffixes for the 'daily' dataframe
+    suffix_list = [
+        "FH",
+        "10first",
+        "10second",
+        "11first",
+        "11second",
+        "12first",
+        "12second",
+        "13first",
+        "13second",
+        "14first",
+        "14second",
+        "SLH",
+        "LH",
+    ]
+
+    interval_mapping_dict = {
+        "09:30:00": "09first",
+        "10:00:00": "FH",
+        "10:30:00": "10first",
+        "11:00:00": "10second",
+        "11:30:00": "11first",
+        "12:00:00": "11second",
+        "12:30:00": "12first",
+        "13:00:00": "12second",
+        "13:30:00": "13first",
+        "14:00:00": "13second",
+        "14:30:00": "14first",
+        "15:00:00": "14second",
+        "15:30:00": "SLH",
+        "16:00:00": "LH",
+    }
+
+    event_after_release_dict = {
+        "ISM": "10:30:00",
+        "FOMC": "14:30:00",
+        "NFP": "09:30:00",
+        "CPI": "09:30:00",
+        "GDP": "09:30:00",
+        "IP": "09:30:00",
+        "PI": "09:30:00",
+        "HST": "09:30:00",
+        "PPI": "09:30:00",
+    }
+    code_dictionary = {
+        "020601": "U.S. Treasury Bonds",
+        "020604": "Long-term U.S. Treasury Bonds",
+        "042601": "2-Year U.S. Treasury Notes",
+        "043602": "10-Year U.S. Treasury Notes",
+        "044601": "5-Year U.S. Treasury Notes",
+        "13874+": "S&P 500 Consolidated",
+        "138741": "S&P 500 Stock Index",
+        "13874A": "S&P 500 Mini",
+        "043607": "Ultra 10-year U.S. Treasury Note",
+    }
+
+    return etf_dict, event_dict, suffix_list, interval_mapping_dict, event_after_release_dict, code_dictionary
+
+
+def plot_financial_products(
+    df,
+    columns_to_plot,
+    product_list=None,
+    title="Financial Product Trends Over Time",
+    xlabel="Date",
+):
+    """
+    Plots specific columns of a multi-index dataframe over time, with each financial product as a separate line.
+
+    Parameters:
+    df (pd.DataFrame): The multi-index dataframe to plot.
+    columns_to_plot (list): List of columns to plot.
+    title (str): Title of the plot.
+    xlabel (str): Label for the x-axis.
+    ylabel (str): Label for the y-axis.
+    """
+    import matplotlib.pyplot as plt
+    code_dictionary = define_mappings()[5]
+    # Get the unique financial product types
+    if product_list:
+        product_types = product_list
+    else:
+        product_types = df.index.get_level_values(0).unique()
+
+    # Create a plot
+    plt.figure(figsize=(10, 6))
+
+    # Loop through each product type
+    for product in product_types:
+        # Extract the data for the current product type
+        product_data = df.loc[product]
+
+        # Plot each specified column for the current product type
+        for column in columns_to_plot:
+            plt.plot(
+                product_data.index,
+                product_data[column],
+                label=f"{code_dictionary[product]} - {column}",
+            )
+
+    if len(columns_to_plot) == 1:
+        ylabel = columns_to_plot[0]
+    else:
+        ylabel = "Data"
+
+    # Add title and labels
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+    # Add legend
+    plt.legend()
+
+    # Show plot
+    plt.show()
+
+
+# Do plots
+def plot_time_series(df: pd.DataFrame, date_col: str, value_col: str):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    # Ensure the date column is in datetime format
+    df[date_col] = pd.to_datetime(df[date_col])
+    
+    # Sort the DataFrame by the date column
+    df = df.sort_values(by=date_col)
+    
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(df[date_col], df[value_col], marker='o', linestyle='-')
+    
+    # Set the plot title and labels
+    plt.title(f'Time Series Plot of {value_col} Over Time')
+    plt.xlabel('Date')
+    plt.ylabel(value_col)
+    
+    # Rotate the date labels for better readability
+    plt.xticks(rotation=45)
+    
+    # Show the plot
+    plt.tight_layout()
+    plt.show()
+
+
+def add_daily_sums(interval_df: pd.DataFrame, interval_date_col: str, interval_value_col: str, 
+                daily_df: pd.DataFrame, daily_date_col: str, output_col_name: str) -> pd.DataFrame:
+    
+    import pandas as pd
+    
+    # Ensure the date columns are in datetime format
+    interval_df[interval_date_col] = pd.to_datetime(interval_df[interval_date_col])
+    daily_df[daily_date_col] = pd.to_datetime(daily_df[daily_date_col])
+    
+    # Group the interval DataFrame by the date column and sum the values for each day
+    daily_sums = interval_df.groupby(interval_date_col)[interval_value_col].sum().reset_index()
+    daily_sums.columns = [daily_date_col, output_col_name]
+    
+    # Merge the daily DataFrame with the aggregated sums
+    result_df = pd.merge(daily_df, daily_sums, left_on=daily_date_col, right_on=daily_date_col, how='left')
+    
+    return result_df
+
+    
+
+
+
+def calculate_daily_return(interval_df: pd.DataFrame, interval_date_col: str, interval_time_col: str, interval_value_col: str, 
+                           daily_df: pd.DataFrame, daily_date_col: str) -> pd.DataFrame:
+    
+    import pandas as pd
+    # Ensure the date and time columns are in datetime format
+    interval_df[interval_date_col] = pd.to_datetime(interval_df[interval_date_col])
+    # interval_df[interval_time_col] = pd.to_datetime(interval_df[interval_time_col], format='%H:%M').dt.time
+    daily_df[daily_date_col] = pd.to_datetime(daily_df[daily_date_col])
+    
+    # Filter the interval DataFrame to only include rows where the time is 16:00
+    interval_df_16 = interval_df[interval_df[interval_time_col] == '16:00:00']
+    interval_df_0930 = interval_df[interval_df[interval_time_col] == '09:30:00']
+    
+    # Merge the filtered interval DataFrame with the daily DataFrame on the date column
+    merged_df = pd.merge(daily_df, interval_df_16[[interval_date_col, interval_value_col]], 
+                         left_on=daily_date_col, right_on=interval_date_col, how='left', suffixes=('', '_16'))
+    merged_df = pd.merge(merged_df, interval_df_0930[[interval_date_col, interval_value_col]], 
+                         left_on=daily_date_col, right_on=interval_date_col, how='left', suffixes=('', '_0930'))
+    
+    # Sort the DataFrame by the date column to ensure correct calculation of returns
+    merged_df = merged_df.sort_values(by=daily_date_col)
+    
+    # Calculate the return values
+    merged_df['Return_close_close'] = (merged_df[interval_value_col] / merged_df[interval_value_col].shift(1)) - 1
+    merged_df['Return_open_close'] = (merged_df[interval_value_col] / merged_df[interval_value_col + '_0930']) - 1
+    
+    return merged_df
